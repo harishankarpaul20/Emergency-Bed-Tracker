@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emergency Bed Tracker — West Bengal</title>
+<meta name="description" content="Search hospitals across West Bengal's 23 districts and view demo bed availability. Demo platform — confirm directly with hospitals.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<!-- ================= 1. TOP EMERGENCY BAR ================= -->
+<div class="top-emergency-bar" role="note">
+  <div class="top-emergency-inner">
+    <span>🚨 <strong>Emergency?</strong> Call 112 for immediate emergency assistance.</span>
+    <a href="tel:112" class="btn btn-emergency-alt btn-xs">CALL 112</a>
+  </div>
+</div>
+
+<!-- ================= 2. NAVIGATION ================= -->
+<header class="navbar" id="navbar">
+  <div class="navbar-inner">
+    <a href="#main-content" class="brand">
+      <span class="brand-mark" aria-hidden="true">🚑</span>
+      <span class="brand-text-wrap">
+        <span class="brand-text">Emergency Bed Tracker</span>
+        <span class="brand-subtitle">West Bengal</span>
+      </span>
+    </a>
+
+    <nav class="nav-links" id="navLinks" aria-label="Primary">
+      <a href="#main-content">Home</a>
+      <a href="#find-beds">Find Beds</a>
+      <a href="#hospitals">Hospitals</a>
+      <a href="#map-section">Map</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#about">About</a>
+    </nav>
+
+    <div class="navbar-actions">
+      <a href="tel:112" class="btn btn-emergency btn-sm" aria-label="Call emergency number 112">
+        🚨 <span>Emergency 112</span>
+      </a>
+      <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#main-content">Home</a>
+    <a href="#find-beds">Find Beds</a>
+    <a href="#hospitals">Hospitals</a>
+    <a href="#map-section">Map</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#about">About</a>
+    <a href="tel:112" class="btn btn-emergency btn-block">🚨 Emergency 112</a>
+  </div>
+</header>
+
+<main id="main-content">
+
+  <!-- ================= 3. HERO ================= -->
+  <section class="hero" aria-labelledby="hero-heading">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">West Bengal · 23 districts</p>
+        <h1 id="hero-heading">Find hospital beds across West Bengal</h1>
+        <p class="hero-tagline">When every second matters, find the right hospital faster.</p>
+        <p class="hero-sub">Search hospitals by district, city and bed type. View demo availability, hospital information and emergency contact options from one place.</p>
+
+        <form class="search-panel" id="heroSearchForm" role="search" aria-label="Search hospitals">
+          <label for="heroSearchInput" class="visually-hidden">Enter city, district or hospital name</label>
+          <div class="search-field">
+            <span aria-hidden="true">📍</span>
+            <input type="text" id="heroSearchInput" placeholder="Enter city, district or hospital name">
+          </div>
+          <button type="submit" class="btn btn-primary">🔍 Find Available Beds</button>
+        </form>
+
+        <div class="hero-actions-row">
+          <button class="btn btn-ghost" id="useLocationBtn" type="button">
+            <span aria-hidden="true">📍</span> Use My Location
+          </button>
+        </div>
+
+        <p class="disclaimer-inline">Demo platform • Bed availability must be confirmed directly with the hospital.</p>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="dash-card">
+          <div class="dash-card-head">
+            <span class="dash-dot"></span>
+            <span>West Bengal network snapshot</span>
+          </div>
+          <div class="dash-grid" id="heroDashGrid">
+            <div class="dash-stat">
+              <span class="dash-num" data-count-target="0" id="dashDistricts">0</span>
+              <span class="dash-label">Districts Covered</span>
+            </div>
+            <div class="dash-stat">
+              <span class="dash-num" data-count-target="0" id="dashHospitals">0</span>
+              <span class="dash-label">Demo Hospitals</span>
+            </div>
+            <div class="dash-stat">
+              <span class="dash-num" data-count-target="0" id="dashBeds">0</span>
+              <span class="dash-label">Demo Beds Tracked</span>
+            </div>
+            <div class="dash-stat">
+              <span class="dash-num" data-count-target="0" id="dashIcu">0</span>
+              <span class="dash-label">Demo ICU Beds</span>
+            </div>
+          </div>
+          <div class="dash-pulse-row">
+            <span class="pulse-dot green"></span> Demo data only — not live capacity
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. LOCATION SEARCH PANEL ================= -->
+  <section class="find-beds-section" id="find-beds" aria-labelledby="find-beds-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Search the network</p>
+        <h2 id="find-beds-heading">Where do you need emergency care?</h2>
+      </div>
+
+      <div class="filter-panel" role="search" aria-label="Filter hospitals">
+        <div class="filter-field">
+          <label for="filterDistrict">Select District</label>
+          <select id="filterDistrict">
+            <option value="all">All West Bengal Districts</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label for="filterCity">Select City / Area</label>
+          <select id="filterCity">
+            <option value="all">All Cities / Areas</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label for="filterBedType">Select Bed Type</label>
+          <select id="filterBedType">
+            <option value="all">All Beds</option>
+            <option value="general">General</option>
+            <option value="icu">ICU</option>
+            <option value="oxygen">Oxygen Supported</option>
+            <option value="ventilator">Ventilator</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label for="filterAvailability">Availability</label>
+          <select id="filterAvailability">
+            <option value="all">All</option>
+            <option value="available">Available</option>
+            <option value="limited">Limited</option>
+            <option value="full">Full</option>
+          </select>
+        </div>
+
+        <div class="filter-field filter-field--grow">
+          <label for="filterSearch">Search by name</label>
+          <input type="text" id="filterSearch" placeholder="Search hospital or location…">
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-primary" id="applyFiltersBtn" type="button">SEARCH HOSPITALS</button>
+          <button class="btn btn-outline" id="clearFiltersBtn" type="button">CLEAR</button>
+        </div>
+      </div>
+
+      <p class="results-meta" id="resultsMeta" aria-live="polite">Showing all demo hospitals</p>
+
+      <!-- Loading state -->
+      <div class="loading-state" id="loadingState" hidden aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        Finding nearby hospitals…
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. STATISTICS ================= -->
+  <section class="stats-section" aria-label="Network statistics">
+    <div class="section-inner">
+      <p class="stats-caption">Sample dashboard statistics — calculated from demo records, not real hospital capacity.</p>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🗺️</span>
+          <span class="stat-num" id="statDistricts">0</span>
+          <span class="stat-label">Districts Covered</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🏥</span>
+          <span class="stat-num" id="statHospitals">0</span>
+          <span class="stat-label">Demo Hospitals</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🛏️</span>
+          <span class="stat-num" id="statBeds">0</span>
+          <span class="stat-label">Demo Beds Tracked</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🚨</span>
+          <span class="stat-num" id="statIcu">0</span>
+          <span class="stat-label">Demo ICU Beds</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🟢</span>
+          <span class="stat-num" id="statAvailable">0</span>
+          <span class="stat-label">Available (Demo)</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🔴</span>
+          <span class="stat-num" id="statFull">0</span>
+          <span class="stat-label">Full (Demo)</span>
+        </div>
+      </div>
+      <p class="stats-footnote">Demo data only.</p>
+    </div>
+  </section>
+
+  <!-- ================= 16. DISTRICT EXPLORER ================= -->
+  <section class="district-section" aria-labelledby="district-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Browse by district</p>
+        <h2 id="district-heading">Explore emergency care across West Bengal</h2>
+        <p class="section-sub">Select a district to filter the hospital list below.</p>
+      </div>
+      <div class="district-grid" id="districtGrid"></div>
+    </div>
+  </section>
+
+  <!-- ================= 6 & 7. HOSPITAL SEARCH RESULTS / CARDS ================= -->
+  <section class="hospitals-section" id="hospitals" aria-labelledby="hospitals-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Results</p>
+        <h2 id="hospitals-heading">Demo hospital availability</h2>
+        <p class="section-sub">All bed counts are demo/sample data. Confirm directly with the hospital before traveling.</p>
+      </div>
+
+      <div class="hospital-grid" id="hospitalGrid" aria-live="polite"></div>
+
+      <div class="empty-state" id="emptyState" hidden>
+        <span class="empty-icon" aria-hidden="true">🔍</span>
+        <h3>No matching hospitals found</h3>
+        <p>Try selecting another district, city or bed type.</p>
+        <button class="btn btn-outline" id="emptyClearBtn" type="button">CLEAR ALL FILTERS</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 8. MAP ================= -->
+  <section class="map-section" id="map-section" aria-labelledby="map-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Geography</p>
+        <h2 id="map-heading">West Bengal hospital map</h2>
+        <p class="section-sub">Approximate demo locations. Click a marker for a quick summary.</p>
+      </div>
+      <div class="map-wrap">
+        <div id="hospitalMap" aria-label="Map of demo hospitals across West Bengal"></div>
+        <div class="map-fallback" id="mapFallback" hidden>
+          <p>🗺️ Map could not be loaded right now.</p>
+          <p>Please check your connection, or browse the hospital list above.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 14. HOW IT WORKS ================= -->
+  <section class="how-it-works" id="how-it-works" aria-labelledby="how-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Three steps</p>
+        <h2 id="how-heading">How it works</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <span class="step-num">01</span>
+          <span class="step-icon" aria-hidden="true">📍</span>
+          <h3>Select location</h3>
+          <p>Choose your district or city.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">02</span>
+          <span class="step-icon" aria-hidden="true">🛏️</span>
+          <h3>Check availability</h3>
+          <p>Compare demo general, ICU and oxygen capacity.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">03</span>
+          <span class="step-icon" aria-hidden="true">📞</span>
+          <h3>Contact hospital</h3>
+          <p>Call the hospital to verify current availability.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 13. EMERGENCY SERVICES ================= -->
+  <section class="emergency-services-section" aria-labelledby="emergency-services-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Contacts</p>
+        <h2 id="emergency-services-heading">Emergency contacts — West Bengal</h2>
+      </div>
+      <div class="emergency-grid">
+        <div class="emergency-card">
+          <span class="emergency-icon" aria-hidden="true">🚨</span>
+          <h3>Emergency</h3>
+          <span class="emergency-number">112</span>
+          <a href="tel:112" class="btn btn-emergency btn-block btn-sm">CALL NOW</a>
+        </div>
+        <div class="emergency-card">
+          <span class="emergency-icon" aria-hidden="true">🚑</span>
+          <h3>Ambulance</h3>
+          <span class="emergency-number">108</span>
+          <a href="tel:108" class="btn btn-emergency btn-block btn-sm">CALL NOW</a>
+        </div>
+        <div class="emergency-card">
+          <span class="emergency-icon" aria-hidden="true">🚓</span>
+          <h3>Police</h3>
+          <span class="emergency-number">100</span>
+          <a href="tel:100" class="btn btn-emergency btn-block btn-sm">CALL NOW</a>
+        </div>
+        <div class="emergency-card">
+          <span class="emergency-icon" aria-hidden="true">🚒</span>
+          <h3>Fire</h3>
+          <span class="emergency-number">101</span>
+          <a href="tel:101" class="btn btn-emergency btn-block btn-sm">CALL NOW</a>
+        </div>
+      </div>
+      <p class="emergency-services-note">For immediate life-threatening emergencies, call the appropriate emergency service.</p>
+    </div>
+  </section>
+
+  <!-- ================= 15. LEGEND ================= -->
+  <section class="legend-section" aria-labelledby="legend-heading">
+    <div class="section-inner">
+      <h2 id="legend-heading" class="visually-hidden">Bed availability legend</h2>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <span class="status-dot green"></span>
+          <div>
+            <strong>Available</strong>
+            <p>Beds shown as available in demo data.</p>
+          </div>
+        </div>
+        <div class="legend-item">
+          <span class="status-dot yellow"></span>
+          <div>
+            <strong>Limited</strong>
+            <p>Low demo availability.</p>
+          </div>
+        </div>
+        <div class="legend-item">
+          <span class="status-dot red"></span>
+          <div>
+            <strong>Full</strong>
+            <p>No demo beds available.</p>
+          </div>
+        </div>
+      </div>
+      <p class="legend-note">Bed availability can change rapidly. Always confirm directly with the hospital.</p>
+    </div>
+  </section>
+
+  <!-- ================= 11. SAFETY / DISCLAIMER ================= -->
+  <section class="trust-section" aria-labelledby="trust-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Please read</p>
+        <h2 id="trust-heading">Data safety &amp; disclaimer</h2>
+      </div>
+      <p class="trust-disclaimer">Availability shown is sample/demo data. Confirm directly with the hospital before traveling. This platform does not replace calling emergency services or the hospital directly.</p>
+    </div>
+  </section>
+
+  <!-- ================= 12. ABOUT ================= -->
+  <section class="about-section" id="about" aria-labelledby="about-heading">
+    <div class="section-inner about-inner">
+      <div>
+        <p class="eyebrow">The idea</p>
+        <h2 id="about-heading">Technology for emergency healthcare in West Bengal</h2>
+        <p>Emergency Bed Tracker – West Bengal is a concept platform designed to make hospital bed discovery faster and easier across the state's 23 districts.</p>
+        <p>A future version could connect hospitals directly, letting staff update availability in real time — so patients, families and ambulance crews always see the latest picture. For now, every number on this site is demo data for illustration only.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 13(spec 15). FUTURE FEATURES ================= -->
+  <section class="future-section" aria-labelledby="future-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Roadmap</p>
+        <h2 id="future-heading">Coming next</h2>
+      </div>
+      <div class="future-grid">
+        <div class="future-card">
+          <span class="future-icon" aria-hidden="true">🔐</span>
+          <h3>Hospital login</h3>
+          <p>Hospitals can securely update bed availability.</p>
+        </div>
+        <div class="future-card">
+          <span class="future-icon" aria-hidden="true">⚡</span>
+          <h3>Real-time updates</h3>
+          <p>Bed counts update instantly.</p>
+        </div>
+        <div class="future-card">
+          <span class="future-icon" aria-hidden="true">🗺️</span>
+          <h3>Smart hospital matching</h3>
+          <p>Find the nearest suitable hospital for a patient's needs.</p>
+        </div>
+        <div class="future-card">
+          <span class="future-icon" aria-hidden="true">🚑</span>
+          <h3>Ambulance integration</h3>
+          <p>Connect patients with nearby ambulance services.</p>
+        </div>
+        <div class="future-card">
+          <span class="future-icon" aria-hidden="true">🔔</span>
+          <h3>Availability alerts</h3>
+          <p>Notify users when required beds become available.</p>
+        </div>
+        <div class="future-card">
+          <span class="future-icon" aria-hidden="true">📊</span>
+          <h3>Hospital dashboard</h3>
+          <p>Hospitals can manage capacity through a dashboard.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= 22. FOOTER ================= -->
+<footer class="site-footer">
+  <div class="section-inner footer-inner">
+    <div class="footer-brand">
+      <span class="brand-mark" aria-hidden="true">🚑</span>
+      <span class="brand-text">Emergency Bed Tracker</span>
+      <p>West Bengal Emergency Healthcare Discovery Platform</p>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="#main-content">Home</a>
+      <a href="#find-beds">Find Beds</a>
+      <a href="#hospitals">Hospitals</a>
+      <a href="#map-section">Map</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#about">About</a>
+    </nav>
+    <div class="footer-emergency">
+      <span class="footer-emergency-label">Emergency</span>
+      <a href="tel:112" class="footer-emergency-number">112</a>
+    </div>
+  </div>
+  <div class="footer-disclaimer-wrap">
+    <p class="footer-disclaimer">This is a demonstration project. Hospital names/locations may reference real facilities, but bed counts and availability displayed by this demo are fictional and must not be used for medical decision-making.</p>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 Emergency Bed Tracker</p>
+    <p>Demo project — availability shown is sample data.</p>
+  </div>
+</footer>
+
+<!-- ================= HOSPITAL DETAILS MODAL ================= -->
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalHospitalName" id="hospitalModal">
+    <button class="modal-close" id="modalCloseBtn" aria-label="Close hospital details">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="modalHospitalName">Hospital name</h2>
+        <p class="modal-verified" id="modalVerified">✓ Verified location</p>
+      </div>
+      <span class="status-badge" id="modalStatusBadge">🟢 Available</span>
+    </div>
+
+    <p class="modal-demo-tag">DEMO DATA – Confirm directly with hospital.</p>
+
+    <div class="modal-body">
+      <div class="modal-info-grid">
+        <div>
+          <span class="modal-info-label">District</span>
+          <p id="modalDistrict">—</p>
+        </div>
+        <div>
+          <span class="modal-info-label">Area</span>
+          <p id="modalArea">—</p>
+        </div>
+        <div>
+          <span class="modal-info-label">Address</span>
+          <p id="modalAddress">—</p>
+        </div>
+        <div>
+          <span class="modal-info-label">Emergency department</span>
+          <p id="modalEmergencyDept">Yes, 24/7</p>
+        </div>
+        <div>
+          <span class="modal-info-label">Contact</span>
+          <p id="modalPhone">Demo contact number</p>
+        </div>
+        <div>
+          <span class="modal-info-label">Last update</span>
+          <p id="modalLastUpdated">—</p>
+        </div>
+      </div>
+
+      <div class="modal-beds-grid">
+        <div class="modal-bed-stat">
+          <span class="modal-bed-num" id="modalGeneralBeds">0</span>
+          <span>General</span>
+        </div>
+        <div class="modal-bed-stat">
+          <span class="modal-bed-num" id="modalIcuBeds">0</span>
+          <span>ICU</span>
+        </div>
+        <div class="modal-bed-stat">
+          <span class="modal-bed-num" id="modalOxygenBeds">0</span>
+          <span>Oxygen</span>
+        </div>
+        <div class="modal-bed-stat">
+          <span class="modal-bed-num" id="modalVentilators">0</span>
+          <span>Ventilators</span>
+        </div>
+      </div>
+
+      <div class="modal-facilities">
+        <span class="modal-info-label">Hospital facilities</span>
+        <ul id="modalFacilities"></ul>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <a href="tel:112" class="btn btn-primary" id="modalCallBtn">📞 Call Hospital</a>
+      <a href="#" target="_blank" rel="noopener" class="btn btn-outline" id="modalDirectionsBtn">🗺️ Get Directions</a>
+      <button class="btn btn-ghost" id="modalCloseBtn2" type="button">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
