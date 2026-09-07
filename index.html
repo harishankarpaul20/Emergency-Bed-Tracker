@@ -41,6 +41,7 @@
       <a href="#map-section">Map</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
+      <a href="#staff-portal" id="navStaffPortalBtn" class="nav-staff-link">🔐 Staff Portal</a>
     </nav>
 
     <div class="navbar-actions">
@@ -60,6 +61,7 @@
     <a href="#map-section">Map</a>
     <a href="#how-it-works">How It Works</a>
     <a href="#about">About</a>
+    <a href="#staff-portal" id="mobileStaffPortalBtn">🔐 Staff Portal</a>
     <a href="tel:112" class="btn btn-emergency btn-block">🚨 Emergency 112</a>
   </div>
 </header>
@@ -543,6 +545,7 @@
     </div>
 
     <div class="modal-footer">
+      <button class="btn btn-emergency" id="modalRequestBedBtn" type="button">🛏️ Request Bed</button>
       <a href="tel:112" class="btn btn-primary" id="modalCallBtn">📞 Call Hospital</a>
       <a href="#" target="_blank" rel="noopener" class="btn btn-outline" id="modalDirectionsBtn">🗺️ Get Directions</a>
       <button class="btn btn-ghost" id="modalCloseBtn2" type="button">CLOSE</button>
@@ -550,8 +553,129 @@
   </div>
 </div>
 
+<!-- ================= BED REQUEST MODAL ================= -->
+<div class="modal-overlay" id="requestBedModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="requestModalTitle" id="requestBedModal">
+    <button class="modal-close" id="requestModalCloseBtn" aria-label="Close bed request modal">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="requestModalTitle">Emergency Bed Reservation</h2>
+        <p class="modal-verified" id="requestHospitalSubtitle">Hospital Name</p>
+      </div>
+      <span class="status-badge available" id="requestModalBadge">🟢 AVAILABLE</span>
+    </div>
+    <p class="modal-demo-tag">DEMO RESERVATION – Submits an atomic reservation request to the hospital.</p>
+
+    <form id="bedRequestForm" class="portal-form">
+      <input type="hidden" id="reqHospitalId">
+      <div class="form-group">
+        <label for="reqPatientName">Patient Full Name *</label>
+        <input type="text" id="reqPatientName" required placeholder="e.g. Subhas Chandra Bose" class="form-control">
+      </div>
+      <div class="form-group">
+        <label for="reqContactPhone">Emergency Contact Phone *</label>
+        <input type="tel" id="reqContactPhone" required placeholder="e.g. +91 98300 12345" class="form-control">
+      </div>
+      <div class="form-group">
+        <label for="reqBedType">Required Bed Category *</label>
+        <select id="reqBedType" required class="form-control">
+          <option value="general">General Bed</option>
+          <option value="icu">ICU Bed</option>
+          <option value="oxygen">Oxygen Supported Bed</option>
+          <option value="ventilator">Ventilator Bed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="reqNotes">Medical Condition / Notes (Optional)</label>
+        <textarea id="reqNotes" rows="3" placeholder="Symptoms, ambulance arrival estimate, or special observation requirement..." class="form-control"></textarea>
+      </div>
+      <div class="modal-footer" style="margin-top: 20px;">
+        <button type="submit" class="btn btn-primary" id="submitBedRequestBtn">CONFIRM RESERVATION</button>
+        <button type="button" class="btn btn-ghost" id="cancelBedRequestBtn">CANCEL</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= STAFF / ADMIN PORTAL MODAL ================= -->
+<div class="modal-overlay" id="staffPortalModalOverlay" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="staffPortalTitle" id="staffPortalModal">
+    <button class="modal-close" id="staffModalCloseBtn" aria-label="Close staff portal">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="staffPortalTitle">Hospital Staff Portal</h2>
+        <p class="eyebrow" id="staffPortalSubtitle">Capacity &amp; Bed Management</p>
+      </div>
+      <span class="status-badge" id="staffAuthBadge">🔒 Not Logged In</span>
+    </div>
+
+    <!-- 1. LOGIN FORM (Shown when unauthenticated) -->
+    <div id="staffLoginSection">
+      <p>Log in as an authorized hospital administrator to update live bed availability and manage bed requests.</p>
+      <div class="demo-auth-hints">
+        <span>Demo Logins:</span>
+        <button type="button" class="btn btn-outline btn-xs" id="prefillApolloBtn">Apollo Admin</button>
+        <button type="button" class="btn btn-outline btn-xs" id="prefillSuperBtn">Super Admin</button>
+      </div>
+      <form id="staffLoginForm" class="portal-form" style="margin-top: 16px;">
+        <div class="form-group">
+          <label for="staffEmail">Staff Email</label>
+          <input type="email" id="staffEmail" required placeholder="admin@apollo.wb.gov.in" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="staffPassword">Password</label>
+          <input type="password" id="staffPassword" required placeholder="••••••••" class="form-control">
+        </div>
+        <div class="modal-footer" style="margin-top: 16px;">
+          <button type="submit" class="btn btn-primary" id="staffLoginSubmitBtn">LOG IN</button>
+          <button type="button" class="btn btn-ghost" id="staffLoginCloseBtn">CLOSE</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 2. STAFF DASHBOARD (Shown when logged in) -->
+    <div id="staffDashboardSection" hidden>
+      <div class="staff-dash-bar">
+        <div>
+          <h3 id="staffHospName" style="margin: 0;">Apollo Multispeciality Hospitals</h3>
+          <p id="staffUserEmail" style="margin: 2px 0 0; font-size: 0.85rem; color: var(--muted);">admin@apollo.wb.gov.in (Hospital Administrator)</p>
+        </div>
+        <button type="button" class="btn btn-outline btn-xs" id="staffLogoutBtn">🚪 Log Out</button>
+      </div>
+
+      <div class="staff-dash-tabs">
+        <h3 style="font-size: 1.05rem; margin-top: 16px;">Bed Inventory &amp; Live Capacity</h3>
+        <p class="section-sub" style="font-size: 0.82rem; margin-bottom: 12px;">Saved changes broadcast instantly to connected ambulance dispatchers and citizen dashboards.</p>
+      </div>
+
+      <div class="table-responsive">
+        <table class="staff-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Total</th>
+              <th>Occupied</th>
+              <th>Reserved</th>
+              <th>Available</th>
+              <th>Update Occupied</th>
+            </tr>
+          </thead>
+          <tbody id="staffBedTableBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size: 1.05rem; margin-top: 24px;">Incoming Bed Requests</h3>
+      <div id="staffRequestsContainer" style="margin-top: 8px;">
+        <p style="color: var(--muted); font-size: 0.88rem;">No requests currently pending.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+<!-- Socket.IO & Leaflet Scripts -->
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="script.js"></script>
 </body>

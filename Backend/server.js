@@ -1,0 +1,176 @@
+require('./config/bootstrap');
+require('dotenv').config();
+const http = require('http');
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const { Server } = require('socket.io');
+const mongoose = require('mongoose');
+
+const { connectDB } = require('./config/db');
+const logger = require('./utils/logger');
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+
+// Routes
+const authRoutes = require('./routes/authRoutes');
+const hospitalRoutes = require('./routes/hospitalRoutes');
+const bedRoutes = require('./routes/bedRoutes');
+const bedRequestRoutes = require('./routes/bedRequestRoutes');
+
+const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.IO with CORS
+const allowedOrigins = [
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  null, // allows opening index.html directly via file://
+];
+if (process.env.CLIENT_URL) {
+  allowedOrigins.push(process.env.CLIENT_URL);
+}
+
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, file://)
+      if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive in dev to guarantee frontend connectivity
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true,
+  },
+});
+
+// Socket.IO event listeners
+io.on('connection', (socket) => {
+  logger.info(`🔌 Socket client connected: ${socket.id}`);
+
+  socket.on('disconnect', () => {
+    logger.info(`🔌 Socket client disconnected: ${socket.id}`);
+  });
+});
+
+// Attach io to every request for controller access
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// Security HTTP headers via Helmet
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Don't break Leaflet maps / CDN scripts
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// CORS configuration
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Dev-friendly
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+// Body Parsers
+app.use(express.json({ limit: '50kb' }));
+app.use(express.urlencoded({ extended: true, limit: '50kb' }));
+
+// HTTP Request Logging
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('dev'));
+}
+
+// Rate Limiting
+const generalLimiter = rateLimit({
+  windowMs: (parseInt(process.env.RATE_LIMIT_WINDOW_MINUTES, 10) || 15) * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 300,
+  message: {
+    success: false,
+    message: 'Too many requests from this IP address. Please try again later.',
+    errors: [],
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS, 10) || 30,
+  message: {
+    success: false,
+    message: 'Too many authentication attempts. Please try again in 15 minutes.',
+    errors: [],
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// Health Check API
+app.get('/api/health', (req, res) => {
+  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const dbState = dbStates[mongoose.connection.readyState] || 'unknown';
+
+  res.status(200).json({
+    success: true,
+    message: 'Medical Bed Tracker API is running',
+    data: {
+      uptimeSeconds: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV || 'development',
+      database: dbState,
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// Mount modular API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/beds', bedRoutes);
+app.use('/api/bed-requests', bedRequestRoutes);
+
+// 404 & Global Error Handling
+app.use(notFound);
+app.use(errorHandler);
+
+// Server startup helper
+const PORT = process.env.PORT || 5000;
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    server.listen(PORT, () => {
+      logger.info(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+      logger.info(`🏥 API Health Check: http://localhost:${PORT}/api/health`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server due to database error', error);
+    process.exit(1);
+  }
+};
+
+// If executed directly, run the server
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, server, io, startServer };
