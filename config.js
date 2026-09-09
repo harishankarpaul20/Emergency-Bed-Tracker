@@ -31,8 +31,18 @@
   );
 
   // 4. Resolve Active URLs (Priority: window override > localStorage override > environment default)
-  const customApiOverride = window.API_BASE_URL || localStorage.getItem('API_BASE_URL');
-  const customSocketOverride = window.SOCKET_URL || localStorage.getItem('SOCKET_URL');
+  let customApiOverride = window.API_BASE_URL || localStorage.getItem('API_BASE_URL');
+  let customSocketOverride = window.SOCKET_URL || localStorage.getItem('SOCKET_URL');
+
+  // Auto-clean stale deprecated -backend.onrender.com overrides from browser storage
+  if (customApiOverride && customApiOverride.includes('emergency-bed-tracker-backend.onrender.com')) {
+    localStorage.removeItem('API_BASE_URL');
+    customApiOverride = null;
+  }
+  if (customSocketOverride && customSocketOverride.includes('emergency-bed-tracker-backend.onrender.com')) {
+    localStorage.removeItem('SOCKET_URL');
+    customSocketOverride = null;
+  }
 
   window.API_BASE_URL = customApiOverride || (isLocal ? LOCAL_API_URL : PRODUCTION_API_URL);
   window.SOCKET_URL = customSocketOverride || (isLocal ? LOCAL_BACKEND_URL : PRODUCTION_BACKEND_URL);
