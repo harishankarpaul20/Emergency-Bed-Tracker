@@ -18,6 +18,7 @@ const authRoutes = require('./routes/authRoutes');
 const hospitalRoutes = require('./routes/hospitalRoutes');
 const bedRoutes = require('./routes/bedRoutes');
 const bedRequestRoutes = require('./routes/bedRequestRoutes');
+const emergencyRoutes = require('./routes/emergencyRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -147,6 +148,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/beds', bedRoutes);
 app.use('/api/bed-requests', bedRequestRoutes);
+app.use('/api/emergency', emergencyRoutes);
 
 // 404 & Global Error Handling
 app.use(notFound);

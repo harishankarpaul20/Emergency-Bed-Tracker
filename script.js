@@ -1119,7 +1119,436 @@
     fetchHospitalsFromBackend();
     fetchStatisticsFromBackend();
     initSocket();
+
+    // Initialize Emergency Patient Intake feature
+    initEmergencyIntake();
+  }
+
+  /* -----------------------------------------------------
+     19. EMERGENCY PATIENT INTAKE & PRIORITIZATION
+     ----------------------------------------------------- */
+  function initEmergencyIntake() {
+    const intakeForm = document.getElementById('patientIntakeForm');
+    if (!intakeForm) return;
+
+    const intakeDistrict = document.getElementById('intakeDistrict');
+    const priorityIndicatorCard = document.getElementById('priorityIndicatorCard');
+    const priorityPill = document.getElementById('priorityPill');
+    const conditionRadios = document.querySelectorAll('input[name="patientCondition"]');
+    const intakeSubmitBtn = document.getElementById('intakeSubmitBtn');
+    const intakeResetBtn = document.getElementById('intakeResetBtn');
+    const intakeLoadingBox = document.getElementById('intakeLoadingBox');
+    const intakeAlertBox = document.getElementById('intakeAlertBox');
+    const intakeResultsContainer = document.getElementById('intakeResultsContainer');
+    const intakeHospitalGrid = document.getElementById('intakeHospitalGrid');
+    const intakeEmptyState = document.getElementById('intakeEmptyState');
+    const successPriorityText = document.getElementById('successPriorityText');
+
+    // 1. Populate West Bengal Districts dropdown
+    if (intakeDistrict && intakeDistrict.options.length <= 1) {
+      DISTRICTS.forEach(district => {
+        const opt = document.createElement('option');
+        opt.value = district;
+        opt.textContent = district;
+        intakeDistrict.appendChild(opt);
+      });
+    }
+
+    // 2. Dynamic Application Priority indicator mapping
+    const CONDITION_PRIORITY_CONFIG = {
+      'Very Serious / Critical': {
+        label: '🚨 Immediate attention',
+        pillClass: 'pill-immediate',
+        cardClass: 'priority-immediate',
+      },
+      'Serious': {
+        label: '⚠️ Urgent attention',
+        pillClass: 'pill-urgent',
+        cardClass: 'priority-urgent',
+      },
+      'Moderate': {
+        label: '🟡 Prompt assessment',
+        pillClass: 'pill-prompt',
+        cardClass: 'priority-prompt',
+      },
+      'Stable': {
+        label: '🟢 Emergency assessment',
+        pillClass: 'pill-emergency',
+        cardClass: 'priority-emergency',
+      },
+      'Unknown': {
+        label: '⚪ Professional assessment required',
+        pillClass: 'pill-unknown',
+        cardClass: '',
+      },
+    };
+
+    function updatePriorityIndicator(condition) {
+      if (!priorityPill || !priorityIndicatorCard) return;
+      const config = CONDITION_PRIORITY_CONFIG[condition] || {
+        label: 'Select condition above',
+        pillClass: '',
+        cardClass: '',
+      };
+
+      priorityPill.textContent = config.label;
+      priorityPill.className = `pic-priority-pill ${config.pillClass}`;
+      priorityIndicatorCard.className = `priority-indicator-card form-col-span-2 ${config.cardClass}`;
+    }
+
+    conditionRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.checked) {
+          updatePriorityIndicator(radio.value);
+          const errEl = document.getElementById('errCondition');
+          if (errEl) errEl.hidden = true;
+        }
+      });
+    });
+
+    // 3. Clear errors on input
+    const inputIds = [
+      { id: 'intakePatientName', err: 'errPatientName' },
+      { id: 'intakeAge', err: 'errAge' },
+      { id: 'intakeSex', err: 'errSex' },
+      { id: 'intakeContact', err: 'errContact' },
+      { id: 'intakeDistrict', err: 'errDistrict' },
+      { id: 'intakeEmergencyType', err: 'errEmergencyType' },
+      { id: 'intakeSymptoms', err: 'errSymptoms' },
+    ];
+
+    inputIds.forEach(({ id, err }) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => {
+          const errEl = document.getElementById(err);
+          if (errEl) errEl.hidden = true;
+          el.classList.remove('is-invalid');
+          if (intakeAlertBox) intakeAlertBox.hidden = true;
+        });
+      }
+    });
+
+    // 4. Client-side Form Validation
+    function validateForm(formData) {
+      let isValid = true;
+      let firstInvalidEl = null;
+
+      function setError(errId, msg, inputEl) {
+        const errEl = document.getElementById(errId);
+        if (errEl) {
+          errEl.textContent = msg;
+          errEl.hidden = false;
+        }
+        if (inputEl) inputEl.classList.add('is-invalid');
+        if (!firstInvalidEl && inputEl) firstInvalidEl = inputEl;
+        isValid = false;
+      }
+
+      // Hide all previous error messages
+      document.querySelectorAll('.field-error-msg').forEach(el => (el.hidden = true));
+
+      if (!formData.patientName || formData.patientName.trim().length < 2) {
+        setError('errPatientName', 'Please enter patient full name (minimum 2 characters)', document.getElementById('intakePatientName'));
+      }
+
+      const ageNum = parseInt(formData.age, 10);
+      if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) {
+        setError('errAge', 'Please enter a valid age between 0 and 120', document.getElementById('intakeAge'));
+      }
+
+      if (!formData.sex) {
+        setError('errSex', 'Please select the patient sex', document.getElementById('intakeSex'));
+      }
+
+      const phoneRegex = /^[6-9]\d{9}$/;
+      if (!formData.contactNumber || !phoneRegex.test(formData.contactNumber.trim())) {
+        setError('errContact', 'Please enter a valid 10-digit Indian mobile number (e.g. 9830123456)', document.getElementById('intakeContact'));
+      }
+
+      if (!formData.district) {
+        setError('errDistrict', 'Please select the patient’s West Bengal district for matching', document.getElementById('intakeDistrict'));
+      }
+
+      if (!formData.emergencyType) {
+        setError('errEmergencyType', 'Please select an emergency type', document.getElementById('intakeEmergencyType'));
+      }
+
+      if (!formData.condition) {
+        setError('errCondition', 'Please select the patient’s condition', document.getElementById('cardConditionCritical'));
+      }
+
+      if (!formData.symptoms || formData.symptoms.trim().length < 5) {
+        setError('errSymptoms', 'Please describe the emergency symptoms in detail (at least 5 characters)', document.getElementById('intakeSymptoms'));
+      }
+
+      if (firstInvalidEl) {
+        firstInvalidEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (typeof firstInvalidEl.focus === 'function') firstInvalidEl.focus();
+      }
+
+      return isValid;
+    }
+
+    // 5. Render Recommended Hospital Card with match badges
+    function renderRecommendedCard(h) {
+      const isFull = h.generalBeds === 0 && h.icuBeds === 0 && h.oxygenBeds === 0;
+      const statusLabel = isFull ? "🔴 CURRENTLY FULL" : STATUS_LABEL[h.status] || "🟢 AVAILABLE";
+      const totalBeds = (h.generalBeds || 0) + (h.icuBeds || 0) + (h.oxygenBeds || 0);
+      const capacityPct = Math.min(100, Math.round((totalBeds / MAX_CAPACITY_REFERENCE) * 100));
+      const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.name + ', ' + (h.address || h.area))}`;
+      const targetId = h._id || h.id;
+
+      const matchChips = (h.matchReasons || [])
+        .slice(0, 3)
+        .map(reason => `<span class="hc-match-chip">✓ ${escapeHtml(reason)}</span>`)
+        .join('');
+
+      return `
+        <article class="hospital-card" data-id="${targetId}" tabindex="0" aria-label="${escapeHtml(h.name)}">
+          <div class="hc-top">
+            <div class="hc-title-row">
+              <span class="hc-icon" aria-hidden="true">🏥</span>
+              <div>
+                <h3 class="hc-name">${escapeHtml(h.name)}</h3>
+                ${h.verified || h.isVerified
+                  ? '<p class="hc-verified">✓ Verified emergency care</p>'
+                  : '<p class="hc-demo-tag">⚠ Demo Hospital Record</p>'}
+              </div>
+            </div>
+            <span class="status-badge ${h.status}">${statusLabel}</span>
+          </div>
+
+          ${matchChips ? `
+            <div class="hc-match-badge" title="Clinical & location match criteria">
+              <span>🎯 Prioritized Match:</span>
+            </div>
+            <div class="hc-match-reasons">${matchChips}</div>
+          ` : ''}
+
+          <div class="hc-meta" style="margin-top: 10px;">
+            <span>📍 ${escapeHtml(h.district)}</span>
+            <span>📍 ${escapeHtml(h.area)}</span>
+            <span>${typeof h.distance === 'number' ? h.distance.toFixed(1) : '3.5'} km away</span>
+          </div>
+
+          <div class="hc-beds">
+            <div class="hc-bed-stat">
+              <span class="${bedNumClass(h.generalBeds || 0)}">${h.generalBeds || 0}</span>
+              <span class="hc-bed-label">General</span>
+            </div>
+            <div class="hc-bed-stat">
+              <span class="${bedNumClass(h.icuBeds || 0)}">${h.icuBeds || 0}</span>
+              <span class="hc-bed-label">ICU</span>
+            </div>
+            <div class="hc-bed-stat">
+              <span class="${bedNumClass(h.oxygenBeds || 0)}">${h.oxygenBeds || 0}</span>
+              <span class="hc-bed-label">Oxygen</span>
+            </div>
+            <div class="hc-bed-stat">
+              <span class="${bedNumClass(h.ventilators || 0)}">${h.ventilators || 0}</span>
+              <span class="hc-bed-label">Vent.</span>
+            </div>
+          </div>
+
+          <div class="hc-capacity">
+            <span class="hc-capacity-label"><span>Emergency capacity (live)</span><span>${capacityPct}%</span></span>
+            <div class="hc-capacity-track">
+              <div class="${capacityFillClass(h.status)}" style="width:${capacityPct}%"></div>
+            </div>
+          </div>
+
+          <p class="hc-updated">Last update: ${escapeHtml(h.lastUpdated || 'Recently')}</p>
+          <p class="hc-demo-note">📞 Emergency Phone: ${escapeHtml(h.phone || 'Available in details')}</p>
+
+          <div class="hc-actions">
+            <button class="btn btn-primary btn-sm view-details-btn" data-id="${targetId}">VIEW DETAILS</button>
+            <button class="btn btn-emergency btn-sm card-req-btn" data-id="${targetId}">🛏️ BOOK</button>
+            <a href="${directionsUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">🗺️ DIRECTIONS</a>
+          </div>
+        </article>
+      `;
+    }
+
+    // 6. Client-side matching fallback if backend is momentarily offline
+    function clientSidePrioritizeHospitals(intakeData) {
+      return hospitals.slice().map(h => {
+        let score = 0;
+        const reasons = [];
+
+        // District match
+        if (intakeData.district && h.district.toLowerCase() === intakeData.district.toLowerCase()) {
+          score += 50;
+          reasons.push(`Located in ${h.district}`);
+        }
+        if (intakeData.area && h.area.toLowerCase().includes(intakeData.area.toLowerCase())) {
+          score += 25;
+          reasons.push(`Near ${h.area}`);
+        }
+
+        // Emergency type scoring
+        const facilities = h.facilities || [];
+        if (facilities.includes('Emergency Department')) {
+          score += 20;
+          reasons.push('24/7 Emergency Department');
+        }
+
+        if (intakeData.emergencyType === 'Cardiac Emergency') {
+          if (h.icuBeds > 0) { score += 40; reasons.push(`ICU Beds available (${h.icuBeds})`); }
+          if (facilities.includes('Diagnostic Services')) score += 15;
+        } else if (intakeData.emergencyType === 'Breathing Problem') {
+          if (h.oxygenBeds > 0) { score += 35; reasons.push(`Oxygen Support available (${h.oxygenBeds})`); }
+          if (h.ventilators > 0) { score += 30; reasons.push(`Ventilators available (${h.ventilators})`); }
+        } else if (['Accident / Trauma', 'Severe Bleeding'].includes(intakeData.emergencyType)) {
+          if (h.generalBeds > 0) score += 20;
+          if (h.icuBeds > 0) { score += 25; reasons.push(`ICU backup (${h.icuBeds} beds)`); }
+          if (facilities.includes('Ambulance Support')) { score += 20; reasons.push('Ambulance Support'); }
+        } else {
+          if (h.generalBeds > 0) score += 20;
+        }
+
+        // Condition severity
+        if (intakeData.condition === 'Very Serious / Critical') {
+          if (h.icuBeds > 0) score += 35;
+          else score -= 20;
+        }
+
+        // Availability status
+        if (h.status === 'available') { score += 30; reasons.push('Beds available'); }
+        else if (h.status === 'limited') score += 15;
+        else if (h.status === 'full') score -= 35;
+
+        return {
+          ...h,
+          score,
+          matchReasons: [...new Set(reasons)],
+        };
+      }).sort((a, b) => b.score - a.score).slice(0, 10);
+    }
+
+    // 7. Form submission handler
+    intakeForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const selectedConditionEl = document.querySelector('input[name="patientCondition"]:checked');
+      const formData = {
+        patientName: document.getElementById('intakePatientName').value.trim(),
+        age: document.getElementById('intakeAge').value.trim(),
+        sex: document.getElementById('intakeSex').value,
+        contactNumber: document.getElementById('intakeContact').value.trim(),
+        attendantName: document.getElementById('intakeAttendant').value.trim(),
+        district: document.getElementById('intakeDistrict').value,
+        area: document.getElementById('intakeArea').value.trim(),
+        ambulanceRequired: document.getElementById('intakeAmbulance').value,
+        emergencyType: document.getElementById('intakeEmergencyType').value,
+        condition: selectedConditionEl ? selectedConditionEl.value : '',
+        symptoms: document.getElementById('intakeSymptoms').value.trim(),
+        additionalInformation: document.getElementById('intakeAdditional').value.trim(),
+      };
+
+      if (!validateForm(formData)) {
+        return;
+      }
+
+      // UI state during processing
+      intakeSubmitBtn.disabled = true;
+      intakeSubmitBtn.textContent = '⏳ Processing Emergency Intake...';
+      if (intakeLoadingBox) intakeLoadingBox.hidden = false;
+      if (intakeAlertBox) intakeAlertBox.hidden = true;
+      if (intakeResultsContainer) intakeResultsContainer.hidden = true;
+
+      try {
+        let recommendedHospitals = [];
+        let applicationPriority = 'Emergency assessment';
+
+        try {
+          const res = await fetch(`${API_BASE_URL}/emergency/intake`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData),
+          });
+
+          const result = await res.json();
+
+          if (!res.ok) {
+            throw new Error(result.message || 'Failed to submit emergency intake');
+          }
+
+          if (result.success && result.data) {
+            recommendedHospitals = result.data.recommendedHospitals || [];
+            applicationPriority = result.data.applicationPriority || 'Emergency assessment';
+          }
+        } catch (apiErr) {
+          console.warn('Backend unavailable, using emergency fallback matching:', apiErr.message);
+          recommendedHospitals = clientSidePrioritizeHospitals(formData);
+          applicationPriority = CONDITION_PRIORITY_CONFIG[formData.condition]?.label || 'Emergency assessment';
+          showToast('⚠️ Prioritizing using local demo hospital records.');
+        }
+
+        // Render recommended hospital cards
+        if (recommendedHospitals && recommendedHospitals.length > 0) {
+          intakeHospitalGrid.innerHTML = recommendedHospitals.map(renderRecommendedCard).join('');
+          intakeHospitalGrid.hidden = false;
+          intakeEmptyState.hidden = true;
+
+          // Wire view details and book buttons on the matched cards
+          intakeHospitalGrid.querySelectorAll('.view-details-btn').forEach(btn => {
+            btn.addEventListener('click', () => showHospitalDetails(btn.dataset.id));
+          });
+
+          intakeHospitalGrid.querySelectorAll('.card-req-btn').forEach(btn => {
+            btn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              openBedRequestModal(btn.dataset.id);
+            });
+          });
+
+          if (successPriorityText) {
+            successPriorityText.textContent = applicationPriority;
+          }
+
+          if (intakeResultsContainer) {
+            intakeResultsContainer.hidden = false;
+            intakeResultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+
+          showToast('✅ Emergency intake processed. Recommended hospitals prioritized.');
+        } else {
+          intakeHospitalGrid.innerHTML = '';
+          intakeHospitalGrid.hidden = true;
+          intakeEmptyState.hidden = false;
+          if (intakeResultsContainer) {
+            intakeResultsContainer.hidden = false;
+            intakeResultsContainer.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+      } catch (err) {
+        console.error('Intake submission error:', err);
+        if (intakeAlertBox) {
+          intakeAlertBox.textContent = '⚠️ Unable to process emergency intake right now. Please dial 112 immediately for emergency care.';
+          intakeAlertBox.hidden = false;
+        }
+      } finally {
+        intakeSubmitBtn.disabled = false;
+        intakeSubmitBtn.textContent = '🔍 FIND SUITABLE HOSPITALS';
+        if (intakeLoadingBox) intakeLoadingBox.hidden = true;
+      }
+    });
+
+    // 8. Form reset handler
+    if (intakeResetBtn) {
+      intakeResetBtn.addEventListener('click', () => {
+        intakeForm.reset();
+        updatePriorityIndicator('');
+        document.querySelectorAll('.field-error-msg').forEach(el => (el.hidden = true));
+        document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        if (intakeAlertBox) intakeAlertBox.hidden = true;
+        if (intakeResultsContainer) intakeResultsContainer.hidden = true;
+        showToast('Intake form cleared.');
+      });
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+

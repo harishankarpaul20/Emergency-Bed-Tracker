@@ -38,6 +38,7 @@
       <a href="#main-content">Home</a>
       <a href="#find-beds">Find Beds</a>
       <a href="#hospitals">Hospitals</a>
+      <a href="#emergency-patient-intake">Patient Intake</a>
       <a href="#map-section">Map</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
@@ -58,6 +59,7 @@
     <a href="#main-content">Home</a>
     <a href="#find-beds">Find Beds</a>
     <a href="#hospitals">Hospitals</a>
+    <a href="#emergency-patient-intake">Patient Intake</a>
     <a href="#map-section">Map</a>
     <a href="#how-it-works">How It Works</a>
     <a href="#about">About</a>
@@ -261,6 +263,270 @@
         <p>Try selecting another district, city or bed type.</p>
         <button class="btn btn-outline" id="emptyClearBtn" type="button">CLEAR ALL FILTERS</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= 7B. EMERGENCY PATIENT INTAKE ================= -->
+  <section class="emergency-intake-section" id="emergency-patient-intake" aria-labelledby="intake-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Emergency Intake & Prioritization</p>
+        <h2 id="intake-heading">Emergency Patient Information</h2>
+        <p class="section-sub">Provide basic patient and emergency details to help identify suitable emergency-care options.</p>
+      </div>
+
+      <!-- Emergency Warning Callout Banner -->
+      <div class="intake-warning-banner" role="alert">
+        <div class="intake-warning-content">
+          <span class="intake-warning-icon" aria-hidden="true">🚨</span>
+          <div class="intake-warning-text">
+            <strong>For life-threatening emergencies, call 112 immediately.</strong>
+            <p>Do not wait for online matching during an acute or critical medical emergency.</p>
+          </div>
+        </div>
+        <div class="intake-warning-actions">
+          <a href="tel:112" class="btn btn-emergency btn-sm">🚨 CALL 112</a>
+          <div class="intake-hotlines-strip">
+            <span>Ambulance: <a href="tel:108"><strong>108</strong></a></span>
+            <span>Police: <a href="tel:100"><strong>100</strong></a></span>
+            <span>Fire: <a href="tel:101"><strong>101</strong></a></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patient Information Form -->
+      <form class="intake-form-box" id="patientIntakeForm" novalidate>
+        <div class="intake-form-grid">
+          
+          <!-- Field 1: Patient Name -->
+          <div class="form-group">
+            <label for="intakePatientName">Patient Name <span class="required-star" aria-hidden="true">*</span></label>
+            <input type="text" id="intakePatientName" class="form-control" placeholder="Enter patient's full name" required autocomplete="name">
+            <span class="field-error-msg" id="errPatientName" hidden></span>
+          </div>
+
+          <!-- Field 2: Age -->
+          <div class="form-group">
+            <label for="intakeAge">Age <span class="required-star" aria-hidden="true">*</span></label>
+            <input type="number" id="intakeAge" class="form-control" placeholder="Enter patient age (0 - 120)" min="0" max="120" required>
+            <span class="field-error-msg" id="errAge" hidden></span>
+          </div>
+
+          <!-- Field 3: Sex -->
+          <div class="form-group">
+            <label for="intakeSex">Sex <span class="required-star" aria-hidden="true">*</span></label>
+            <select id="intakeSex" class="form-control" required>
+              <option value="">Select sex</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+            <span class="field-error-msg" id="errSex" hidden></span>
+          </div>
+
+          <!-- Field 7: Contact Number (Kept Private) -->
+          <div class="form-group">
+            <label for="intakeContact">Contact Number <span class="required-star" aria-hidden="true">*</span></label>
+            <input type="tel" id="intakeContact" class="form-control" placeholder="10-digit mobile (e.g. 9830123456)" required autocomplete="tel">
+            <span class="field-privacy-note">🔒 Kept strictly private for emergency coordination.</span>
+            <span class="field-error-msg" id="errContact" hidden></span>
+          </div>
+
+          <!-- Field 8: Attendant / Guardian Name (Optional) -->
+          <div class="form-group">
+            <label for="intakeAttendant">Attendant / Guardian Name <span class="optional-tag">(Optional)</span></label>
+            <input type="text" id="intakeAttendant" class="form-control" placeholder="Guardian or attendant's full name">
+          </div>
+
+          <!-- Location: District (For Matching) -->
+          <div class="form-group">
+            <label for="intakeDistrict">Patient Location / District <span class="required-star" aria-hidden="true">*</span></label>
+            <select id="intakeDistrict" class="form-control" required>
+              <option value="">Select district (West Bengal)...</option>
+            </select>
+            <span class="field-error-msg" id="errDistrict" hidden></span>
+          </div>
+
+          <!-- Location: City / Area / Locality -->
+          <div class="form-group">
+            <label for="intakeArea">City / Area / Landmark <span class="optional-tag">(Optional)</span></label>
+            <input type="text" id="intakeArea" class="form-control" placeholder="e.g. Salt Lake, Kankurgachi, Howrah, Siliguri">
+          </div>
+
+          <!-- Field 9: Ambulance Required? -->
+          <div class="form-group">
+            <label for="intakeAmbulance">Ambulance Required? <span class="required-star" aria-hidden="true">*</span></label>
+            <select id="intakeAmbulance" class="form-control" required>
+              <option value="Not Sure">Not Sure</option>
+              <option value="Yes">Yes — Ambulance Required</option>
+              <option value="No">No — Self Transport</option>
+            </select>
+            <span class="field-error-msg" id="errAmbulance" hidden></span>
+          </div>
+
+          <!-- Field 6: Emergency Type -->
+          <div class="form-group form-col-span-2">
+            <label for="intakeEmergencyType">Emergency Type <span class="required-star" aria-hidden="true">*</span></label>
+            <select id="intakeEmergencyType" class="form-control" required>
+              <option value="">Select emergency type...</option>
+              <option value="General Emergency">General Emergency</option>
+              <option value="Accident / Trauma">Accident / Trauma</option>
+              <option value="Cardiac Emergency">Cardiac Emergency</option>
+              <option value="Breathing Problem">Breathing Problem</option>
+              <option value="Stroke Symptoms">Stroke Symptoms</option>
+              <option value="Severe Bleeding">Severe Bleeding</option>
+              <option value="Burn">Burn</option>
+              <option value="Poisoning">Poisoning</option>
+              <option value="Pregnancy / Obstetric Emergency">Pregnancy / Obstetric Emergency</option>
+              <option value="Pediatric Emergency">Pediatric Emergency</option>
+              <option value="Other">Other</option>
+            </select>
+            <span class="field-error-msg" id="errEmergencyType" hidden></span>
+          </div>
+
+          <!-- Field 5: Patient Condition (Interactive Radio Cards) -->
+          <div class="form-group form-col-span-2">
+            <label>Patient Condition <span class="required-star" aria-hidden="true">*</span></label>
+            <div class="condition-cards-grid" role="radiogroup" aria-label="Select patient condition">
+              
+              <label class="condition-radio-card condition-critical-card" id="cardConditionCritical">
+                <input type="radio" name="patientCondition" value="Very Serious / Critical" required>
+                <div class="crc-content">
+                  <span class="crc-badge">🚨 CRITICAL</span>
+                  <strong class="crc-title">Very Serious / Critical</strong>
+                  <span class="crc-desc">Unconscious, gasping, heavy trauma, cardiac arrest</span>
+                </div>
+              </label>
+
+              <label class="condition-radio-card" id="cardConditionSerious">
+                <input type="radio" name="patientCondition" value="Serious">
+                <div class="crc-content">
+                  <span class="crc-badge-warning">⚠️ SERIOUS</span>
+                  <strong class="crc-title">Serious</strong>
+                  <span class="crc-desc">Severe distress, chest pain, breathing difficulty, deep wounds</span>
+                </div>
+              </label>
+
+              <label class="condition-radio-card" id="cardConditionModerate">
+                <input type="radio" name="patientCondition" value="Moderate">
+                <div class="crc-content">
+                  <span class="crc-badge-muted">🟡 MODERATE</span>
+                  <strong class="crc-title">Moderate</strong>
+                  <span class="crc-desc">Stable vitals but deteriorating symptoms requiring rapid care</span>
+                </div>
+              </label>
+
+              <label class="condition-radio-card" id="cardConditionStable">
+                <input type="radio" name="patientCondition" value="Stable">
+                <div class="crc-content">
+                  <span class="crc-badge-success">🟢 STABLE</span>
+                  <strong class="crc-title">Stable</strong>
+                  <span class="crc-desc">Conscious, stable vitals, requiring emergency assessment</span>
+                </div>
+              </label>
+
+              <label class="condition-radio-card" id="cardConditionUnknown">
+                <input type="radio" name="patientCondition" value="Unknown">
+                <div class="crc-content">
+                  <span class="crc-badge-muted">⚪ UNKNOWN</span>
+                  <strong class="crc-title">Unknown</strong>
+                  <span class="crc-desc">Condition undetermined or pending first examination</span>
+                </div>
+              </label>
+
+            </div>
+            <span class="field-error-msg" id="errCondition" hidden></span>
+          </div>
+
+          <!-- Dynamic Application Priority Indicator -->
+          <div class="priority-indicator-card form-col-span-2" id="priorityIndicatorCard">
+            <div class="pic-header">
+              <span class="pic-eyebrow">APPLICATION PRIORITY</span>
+              <span class="pic-priority-pill" id="priorityPill">Select condition above</span>
+            </div>
+            <p class="pic-warning-note">
+              ⚖️ <strong>Important Notice:</strong> This indicator reflects an <em>Application Priority</em> for bed and hospital capability sorting and is <strong>NOT a medical diagnosis</strong>. This application does not replace professional medical assessment. For life-threatening emergencies, contact emergency services immediately.
+            </p>
+          </div>
+
+          <!-- Field 4: Symptoms (Textarea) -->
+          <div class="form-group form-col-span-2">
+            <label for="intakeSymptoms">Symptoms & Emergency Description <span class="required-star" aria-hidden="true">*</span></label>
+            <textarea id="intakeSymptoms" class="form-control" rows="3" placeholder="Describe the patient's main symptoms, injury, or emergency problem..." required></textarea>
+            <span class="field-hint">Include duration, onset, and specific complaints (e.g. chest pressure, blood loss, difficulty breathing).</span>
+            <span class="field-error-msg" id="errSymptoms" hidden></span>
+          </div>
+
+          <!-- Field 10: Additional Information (Optional Textarea) -->
+          <div class="form-group form-col-span-2">
+            <label for="intakeAdditional">Additional Information <span class="optional-tag">(Optional)</span></label>
+            <textarea id="intakeAdditional" class="form-control" rows="2" placeholder="Pre-existing medical conditions, allergies, or special needs..."></textarea>
+          </div>
+
+        </div>
+
+        <!-- Submission Row -->
+        <div class="intake-submit-row">
+          <button type="submit" class="btn btn-primary btn-lg" id="intakeSubmitBtn">
+            🔍 FIND SUITABLE HOSPITALS
+          </button>
+          <button type="button" class="btn btn-outline" id="intakeResetBtn">CLEAR FORM</button>
+        </div>
+
+        <!-- Loading / Progress State -->
+        <div class="intake-loading-box" id="intakeLoadingBox" hidden>
+          <div class="intake-spinner" aria-hidden="true"></div>
+          <div class="intake-loading-text">
+            <strong>Finding suitable emergency hospitals...</strong>
+            <p>Evaluating emergency capabilities, bed availability, and district proximity.</p>
+          </div>
+        </div>
+
+        <!-- Global Inline Error -->
+        <div class="intake-alert-box alert-danger" id="intakeAlertBox" hidden role="alert"></div>
+      </form>
+
+      <!-- ================= RECOMMENDED HOSPITALS RESULTS ================= -->
+      <div class="intake-results-container" id="intakeResultsContainer" hidden>
+        <div class="intake-results-header">
+          <div class="section-heading">
+            <p class="eyebrow">Prioritized Emergency Options</p>
+            <h3 id="recommendedHeading">Recommended Emergency Hospitals</h3>
+            <p class="section-sub">Results are prioritized using the information provided. Confirm availability and suitability directly with the hospital.</p>
+          </div>
+
+          <!-- Demo Data Callout Warning -->
+          <div class="demo-data-warning-bar" role="note">
+            <span class="ddw-icon" aria-hidden="true">⚠️</span>
+            <div class="ddw-content">
+              <strong>DEMO DATA — HOSPITAL AVAILABILITY IS NOT REAL-TIME</strong>
+              <p>All bed counts shown are sample/demo figures. Always confirm current bed availability directly with the hospital.</p>
+            </div>
+          </div>
+
+          <!-- Success Notification Pill -->
+          <div class="intake-success-banner" id="intakeSuccessBanner">
+            <span class="isb-icon">✅</span>
+            <div class="isb-body">
+              <strong>Emergency request processed</strong>
+              <p>Here are the hospitals prioritized for your selected emergency details. Priority assigned: <span id="successPriorityText">Emergency assessment</span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommended Hospital Cards Grid -->
+        <div class="hospital-grid" id="intakeHospitalGrid" aria-live="polite"></div>
+
+        <!-- Empty Results Fallback -->
+        <div class="empty-state" id="intakeEmptyState" hidden>
+          <span class="empty-icon" aria-hidden="true">🏥</span>
+          <h3>No matching emergency facilities found</h3>
+          <p>Please broaden your district or contact emergency services immediately.</p>
+          <a href="tel:112" class="btn btn-emergency">🚨 CALL 112 IMMEDIATELY</a>
+        </div>
+      </div>
+
     </div>
   </section>
 
