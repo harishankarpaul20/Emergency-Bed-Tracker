@@ -111,6 +111,7 @@
   const staffModalCloseBtn = document.getElementById('staffModalCloseBtn');
   const staffLoginCloseBtn = document.getElementById('staffLoginCloseBtn');
   const staffLoginForm = document.getElementById('staffLoginForm');
+  const staffHospitalSelect = document.getElementById('staffHospitalSelect');
   const staffLoginSubmitBtn = document.getElementById('staffLoginSubmitBtn');
   const staffLoginSection = document.getElementById('staffLoginSection');
   const staffDashboardSection = document.getElementById('staffDashboardSection');
@@ -215,11 +216,22 @@
         populateCityDropdown(filterDistrict.value);
         renderHospitals(filterHospitals());
         updateMapMarkers();
+        populateStaffHospitalDropdown();
       }
     } catch (err) {
       console.warn('Backend hospital fetch note (using fallback):', err.message);
     } finally {
       loadingState.hidden = true;
+    }
+  }
+
+  function populateStaffHospitalDropdown() {
+    if (!staffHospitalSelect) return;
+    const currentVal = staffHospitalSelect.value;
+    staffHospitalSelect.innerHTML = '<option value="">Select Hospital ▼</option>' +
+      hospitals.map(h => `<option value="${h._id || h.id}">${escapeHtml(h.name)} (${escapeHtml(h.district)})</option>`).join('');
+    if (currentVal) {
+      staffHospitalSelect.value = currentVal;
     }
   }
 
@@ -690,6 +702,7 @@
   function openStaffPortalModal() {
     staffPortalModalOverlay.hidden = false;
     document.body.style.overflow = 'hidden';
+    populateStaffHospitalDropdown();
 
     if (authToken && currentUser) {
       renderStaffDashboard();
@@ -720,6 +733,7 @@
     staffDashboardSection.hidden = true;
     staffAuthBadge.textContent = '🔒 Not Logged In';
     staffAuthBadge.className = 'status-badge';
+    populateStaffHospitalDropdown();
   }
 
   let currentSuperAdminHospId = null;
@@ -1011,6 +1025,7 @@
   // Staff Login Submission
   staffLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const hospitalId = staffHospitalSelect ? staffHospitalSelect.value : '';
     const email = document.getElementById('staffEmail').value.trim();
     const password = document.getElementById('staffPassword').value;
 
@@ -1018,9 +1033,14 @@
     staffLoginSubmitBtn.textContent = '⏳ Logging in...';
 
     try {
+      const payload = { email, password };
+      if (hospitalId) {
+        payload.hospitalId = hospitalId;
+      }
+
       const res = await apiRequest('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       });
 
       authToken = res.data.token;
@@ -1050,12 +1070,21 @@
     prefillApolloBtn.addEventListener('click', () => {
       document.getElementById('staffEmail').value = 'admin@apollo.wb.gov.in';
       document.getElementById('staffPassword').value = 'Password123!';
+      if (staffHospitalSelect) {
+        const apolloOpt = Array.from(staffHospitalSelect.options).find(o => o.text.toLowerCase().includes('apollo'));
+        if (apolloOpt) {
+          staffHospitalSelect.value = apolloOpt.value;
+        }
+      }
     });
   }
   if (prefillSuperBtn) {
     prefillSuperBtn.addEventListener('click', () => {
       document.getElementById('staffEmail').value = 'superadmin@demo.wb.gov.in';
       document.getElementById('staffPassword').value = 'SuperAdmin123!';
+      if (staffHospitalSelect) {
+        staffHospitalSelect.value = '';
+      }
     });
   }
 

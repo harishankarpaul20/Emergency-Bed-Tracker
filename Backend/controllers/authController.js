@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Hospital = require('../models/Hospital');
+const mongoose = require('mongoose');
 const generateToken = require('../utils/generateToken');
 
 /**
@@ -61,7 +63,7 @@ const register = async (req, res, next) => {
  */
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, hospitalId } = req.body;
 
     const user = await User.findOne({ email: email.toLowerCase() })
       .select('+passwordHash')
@@ -90,6 +92,35 @@ const login = async (req, res, next) => {
         message: 'Invalid email or password.',
         errors: [],
       });
+    }
+
+    // Hospital validation for hospital_admin accounts
+    if (user.role === 'hospital_admin' && hospitalId) {
+      const isValidMongoId = mongoose.Types.ObjectId.isValid(hospitalId);
+      let hospitalExists = false;
+      if (isValidMongoId) {
+        hospitalExists = await Hospital.exists({ _id: hospitalId });
+      }
+
+      if (!hospitalExists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Selected hospital does not exist.',
+          errors: [{ field: 'hospitalId', message: 'Hospital not found in database' }],
+        });
+      }
+
+      const userHospId = user.hospital
+        ? (user.hospital._id ? user.hospital._id.toString() : user.hospital.toString())
+        : null;
+
+      if (!userHospId || userHospId !== hospitalId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Hospital selection does not match this staff account.',
+          errors: [{ field: 'hospitalId', message: 'Selected hospital does not match user account' }],
+        });
+      }
     }
 
     const token = generateToken(user._id, user.role);

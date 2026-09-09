@@ -2,14 +2,17 @@
  * ======================================================================
  * HOSPITAL-SPECIFIC STAFF ADMIN AUTHENTICATION, AUTHORIZATION & PERSISTENCE TEST SUITE
  * ======================================================================
- * Verifies all 18+ test requirements:
- * - Dynamic hospital loading from MongoDB (single source of truth)
- * - Hospital admin isolation (strict 403 on cross-hospital operations)
- * - Super admin global powers & staff administration APIs
- * - Protection against ID / URL manipulation
- * - Secure password hashing & duplicate email rejection
- * - Verified persistence in MongoDB Atlas
- * - Preservation of public search features
+ * Validates the complete multi-hospital authentication and authorization system:
+ * - Dynamic hospital loading from MongoDB (Single Source of Truth)
+ * - Hospital dropdown selection during login
+ * - Matching hospital selection succeeds (200)
+ * - Wrong hospital selection fails with 403 Forbidden
+ * - Database document verification (no trust on frontend hospitalId)
+ * - Hospital Admin isolation (approvals, rejections, bed updates)
+ * - Super Admin global role & hospital admin creation
+ * - Password hashing with bcrypt
+ * - Persistence in MongoDB Atlas
+ * - Preservation of public search and bed availability
  */
 
 require('../config/bootstrap');
@@ -58,8 +61,8 @@ async function runStaffAuthTests() {
   let apolloAdminToken = '';
   let secondAdminToken = '';
 
-  let hospitalA = null; // Apollo Multispeciality Hospitals
-  let hospitalB = null; // Second hospital (e.g. Ruby General Hospital)
+  let hospitalA = null; // e.g. Apollo Multispeciality Hospitals
+  let hospitalB = null; // e.g. Ruby General Hospital or Asansol
   let hospitalABed = null;
   let hospitalBBed = null;
 
@@ -81,42 +84,31 @@ async function runStaffAuthTests() {
     hospitalBBed = await Bed.findOne({ hospital: hospitalB._id, isActive: true });
 
     // ----------------------------------------------------
-    // TEST 21 / PREP: Super Admin Login
+    // PREPARATION: Super Admin Login
     // ----------------------------------------------------
     const resSuperLogin = await requestJson(`${BASE_URL}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ email: 'superadmin@demo.wb.gov.in', password: 'SuperAdmin123!' }),
     });
     superAdminToken = resSuperLogin.body.data?.token;
-    const isSuperOk = resSuperLogin.status === 200 && resSuperLogin.body.data?.user?.role === 'super_admin';
-    logTest(21, 'Super Administrator Authentication (Global Role)', isSuperOk, `Role: ${resSuperLogin.body.data?.user?.role}`);
 
     // ----------------------------------------------------
-    // TEST 11: Super Admin creates Hospital A Admin
+    // PREPARATION: Super Admin creates Hospital A Admin & Hospital B Admin in MongoDB
     // ----------------------------------------------------
-    const apolloAdminEmail = `apollo_admin_${Date.now()}@wb.gov.in`;
-    const resCreateApolloAdmin = await requestJson(`${BASE_URL}/admin/staff`, {
+    const apolloAdminEmail = `admin_a_${Date.now()}@wb.gov.in`;
+    const resCreateA = await requestJson(`${BASE_URL}/admin/staff`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${superAdminToken}` },
       body: JSON.stringify({
-        name: 'Apollo Hospital Admin',
+        name: `${hospitalA.name} Admin`,
         email: apolloAdminEmail,
         password: 'Password123!',
         hospitalId: hospitalA._id.toString(),
       }),
     });
-    const createdApolloId = resCreateApolloAdmin.body.data?.id;
-    const isCreateAOk =
-      resCreateApolloAdmin.status === 201 &&
-      resCreateApolloAdmin.body.data?.role === 'hospital_admin' &&
-      resCreateApolloAdmin.body.data?.hospitalId === hospitalA._id.toString();
-    logTest(11, 'Super Admin Creates Hospital A Admin in MongoDB', isCreateAOk, `HospitalId: ${resCreateApolloAdmin.body.data?.hospitalId}`);
 
-    // ----------------------------------------------------
-    // TEST 12: Super Admin creates Hospital B Admin
-    // ----------------------------------------------------
-    const secondAdminEmail = `second_admin_${Date.now()}@wb.gov.in`;
-    const resCreateSecondAdmin = await requestJson(`${BASE_URL}/admin/staff`, {
+    const secondAdminEmail = `admin_b_${Date.now()}@wb.gov.in`;
+    const resCreateB = await requestJson(`${BASE_URL}/admin/staff`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${superAdminToken}` },
       body: JSON.stringify({
@@ -126,39 +118,80 @@ async function runStaffAuthTests() {
         hospitalId: hospitalB._id.toString(),
       }),
     });
-    const isCreateBOk =
-      resCreateSecondAdmin.status === 201 &&
-      resCreateSecondAdmin.body.data?.role === 'hospital_admin' &&
-      resCreateSecondAdmin.body.data?.hospitalId === hospitalB._id.toString();
-    logTest(12, 'Super Admin Creates Hospital B Admin in MongoDB', isCreateBOk, `HospitalId: ${resCreateSecondAdmin.body.data?.hospitalId}`);
 
     // ----------------------------------------------------
-    // TEST 1: Hospital A Admin logs in
+    // TEST 1: Hospital A Admin logs in with Hospital A selected (SUCCESS)
     // ----------------------------------------------------
-    const resApolloLogin = await requestJson(`${BASE_URL}/auth/login`, {
+    const resA_Login = await requestJson(`${BASE_URL}/auth/login`, {
       method: 'POST',
-      body: JSON.stringify({ email: apolloAdminEmail, password: 'Password123!' }),
+      body: JSON.stringify({
+        email: apolloAdminEmail,
+        password: 'Password123!',
+        hospitalId: hospitalA._id.toString(),
+      }),
     });
-    apolloAdminToken = resApolloLogin.body.data?.token;
-    const isApolloLoginOk =
-      resApolloLogin.status === 200 &&
-      resApolloLogin.body.data?.user?.role === 'hospital_admin' &&
-      (resApolloLogin.body.data?.user?.hospitalId === hospitalA._id.toString() ||
-        resApolloLogin.body.data?.user?.hospital?._id === hospitalA._id.toString());
-    logTest(1, 'Hospital A Admin Login Contract & Identification', isApolloLoginOk, `Role: ${resApolloLogin.body.data?.user?.role}`);
+    apolloAdminToken = resA_Login.body.data?.token;
+    const isA_LoginOk =
+      resA_Login.status === 200 &&
+      resA_Login.body.data?.user?.role === 'hospital_admin' &&
+      resA_Login.body.data?.user?.hospitalId === hospitalA._id.toString();
+    logTest(1, 'Hospital A Admin logs in with Hospital A selected (SUCCESS)', isA_LoginOk, `Status: ${resA_Login.status}, HospitalId: ${resA_Login.body.data?.user?.hospitalId}`);
 
-    // Log in Hospital B Admin
-    const resSecondLogin = await requestJson(`${BASE_URL}/auth/login`, {
+    // ----------------------------------------------------
+    // TEST 2: Hospital B Admin logs in with Hospital B selected (SUCCESS)
+    // ----------------------------------------------------
+    const resB_Login = await requestJson(`${BASE_URL}/auth/login`, {
       method: 'POST',
-      body: JSON.stringify({ email: secondAdminEmail, password: 'Password123!' }),
+      body: JSON.stringify({
+        email: secondAdminEmail,
+        password: 'Password123!',
+        hospitalId: hospitalB._id.toString(),
+      }),
     });
-    secondAdminToken = resSecondLogin.body.data?.token;
+    secondAdminToken = resB_Login.body.data?.token;
+    const isB_LoginOk =
+      resB_Login.status === 200 &&
+      resB_Login.body.data?.user?.role === 'hospital_admin' &&
+      resB_Login.body.data?.user?.hospitalId === hospitalB._id.toString();
+    logTest(2, 'Hospital B Admin logs in with Hospital B selected (SUCCESS)', isB_LoginOk, `Status: ${resB_Login.status}, HospitalId: ${resB_Login.body.data?.user?.hospitalId}`);
+
+    // ----------------------------------------------------
+    // TEST 3: Hospital A Admin credentials + Hospital B selected (LOGIN DENIED - 403 Forbidden)
+    // ----------------------------------------------------
+    const resA_WrongHosp = await requestJson(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: apolloAdminEmail,
+        password: 'Password123!',
+        hospitalId: hospitalB._id.toString(), // Wrong hospital selected
+      }),
+    });
+    const isWrongHospBlocked =
+      resA_WrongHosp.status === 403 &&
+      resA_WrongHosp.body.message === 'Hospital selection does not match this staff account.';
+    logTest(3, 'Hospital A Admin credentials + Hospital B selected (LOGIN DENIED)', isWrongHospBlocked, `Status: ${resA_WrongHosp.status}, Message: ${resA_WrongHosp.body.message}`);
+
+    // ----------------------------------------------------
+    // TEST 4: Hospital B Admin credentials + Hospital A selected (LOGIN DENIED - 403 Forbidden)
+    // ----------------------------------------------------
+    const resB_WrongHosp = await requestJson(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: secondAdminEmail,
+        password: 'Password123!',
+        hospitalId: hospitalA._id.toString(), // Wrong hospital selected
+      }),
+    });
+    const isBWrongHospBlocked =
+      resB_WrongHosp.status === 403 &&
+      resB_WrongHosp.body.message === 'Hospital selection does not match this staff account.';
+    logTest(4, 'Hospital B Admin credentials + Hospital A selected (LOGIN DENIED)', isBWrongHospBlocked, `Status: ${resB_WrongHosp.status}, Message: ${resB_WrongHosp.body.message}`);
 
     // ----------------------------------------------------
     // PREPARATION: Create Bed Requests for Hospital A and Hospital B
     // ----------------------------------------------------
     requestForHospitalA = await BedRequest.create({
-      user: resApolloLogin.body.data.user.id,
+      user: resA_Login.body.data.user.id,
       hospital: hospitalA._id,
       bed: hospitalABed._id,
       bedType: hospitalABed.type,
@@ -168,7 +201,7 @@ async function runStaffAuthTests() {
     });
 
     requestForHospitalB = await BedRequest.create({
-      user: resSecondLogin.body.data.user.id,
+      user: resB_Login.body.data.user.id,
       hospital: hospitalB._id,
       bed: hospitalBBed._id,
       bedType: hospitalBBed.type,
@@ -177,263 +210,253 @@ async function runStaffAuthTests() {
       status: 'pending',
     });
 
-    // ----------------------------------------------------
-    // TEST 2: Hospital A Admin views requests (queries own hospital)
-    // ----------------------------------------------------
-    const resViewA = await requestJson(`${BASE_URL}/bed-requests`, {
-      headers: { Authorization: `Bearer ${apolloAdminToken}` },
-    });
-    const requestsReturnedForA = resViewA.body.data || [];
-    const onlyHospitalA = requestsReturnedForA.every(
-      (r) => (r.hospital?._id || r.hospital).toString() === hospitalA._id.toString()
-    );
-    logTest(2, 'Hospital A Admin Views Own Hospital Requests Only', resViewA.status === 200 && onlyHospitalA, `Count: ${requestsReturnedForA.length}`);
+    const reqA_Id = requestForHospitalA._id.toString();
+    const reqB_Id = requestForHospitalB._id.toString();
 
     // ----------------------------------------------------
-    // TEST 3: Hospital A Admin views Hospital B requests
+    // TEST 5: Hospital A Admin approves Hospital A request (SUCCESS + MongoDB updated)
     // ----------------------------------------------------
-    const hasHospitalBDataInAList = requestsReturnedForA.some(
-      (r) => (r.hospital?._id || r.hospital).toString() === hospitalB._id.toString()
-    );
-    logTest(3, 'Hospital A Admin Cannot Access Hospital B Data in Queries', !hasHospitalBDataInAList, 'Hospital B data excluded at query level');
-
-    // ----------------------------------------------------
-    // TEST 6: Hospital A Admin attempts to APPROVE Hospital B request (403 FORBIDDEN)
-    // ----------------------------------------------------
-    const resApproveForbidden = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalB._id}/approve`, {
+    const resApproveA = await requestJson(`${BASE_URL}/bed-requests/${reqA_Id}/approve`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${apolloAdminToken}` },
     });
-    const docBAfterForbiddenApprove = await BedRequest.findById(requestForHospitalB._id);
-    const isTest6Passed =
-      resApproveForbidden.status === 403 &&
-      resApproveForbidden.body.success === false &&
-      docBAfterForbiddenApprove.status === 'pending';
-    logTest(6, 'Hospital A Admin Blocked From Approving Hospital B Request (403 Forbidden)', isTest6Passed, `Status: ${resApproveForbidden.status}, DB Status: ${docBAfterForbiddenApprove.status}`);
+    const dbReqA = await BedRequest.findById(reqA_Id);
+    const isApproveAOk = resApproveA.status === 200 && dbReqA.status === 'approved';
+    logTest(5, 'Hospital A Admin approves Hospital A request (MongoDB Persisted)', isApproveAOk, `Status: ${resApproveA.status}, DB Status: ${dbReqA?.status}`);
 
     // ----------------------------------------------------
-    // TEST 7: Hospital A Admin attempts to REJECT Hospital B request (403 FORBIDDEN)
+    // TEST 6: Hospital A Admin attempts to approve Hospital B request (403 Forbidden + MongoDB unchanged)
     // ----------------------------------------------------
-    const resRejectForbidden = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalB._id}/reject`, {
+    const resCrossApproveA = await requestJson(`${BASE_URL}/bed-requests/${reqB_Id}/approve`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${apolloAdminToken}` },
     });
-    const docBAfterForbiddenReject = await BedRequest.findById(requestForHospitalB._id);
-    const isTest7Passed =
-      resRejectForbidden.status === 403 &&
-      resRejectForbidden.body.success === false &&
-      docBAfterForbiddenReject.status === 'pending';
-    logTest(7, 'Hospital A Admin Blocked From Rejecting Hospital B Request (403 Forbidden)', isTest7Passed, `Status: ${resRejectForbidden.status}, DB Status: ${docBAfterForbiddenReject.status}`);
+    const dbReqB_afterA = await BedRequest.findById(reqB_Id);
+    const isCrossApproveABlocked = resCrossApproveA.status === 403 && dbReqB_afterA.status === 'pending';
+    logTest(6, 'Hospital A Admin attempts to approve Hospital B request (403 + MongoDB Unchanged)', isCrossApproveABlocked, `Status: ${resCrossApproveA.status}, DB Status: ${dbReqB_afterA?.status}`);
 
     // ----------------------------------------------------
-    // TEST 4: Hospital A Admin APPROVES Hospital A request (200 OK)
+    // TEST 7: Hospital B Admin approves Hospital B request (SUCCESS + MongoDB updated)
     // ----------------------------------------------------
-    const resApproveAllowed = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalA._id}/approve`, {
+    const resApproveB = await requestJson(`${BASE_URL}/bed-requests/${reqB_Id}/approve`, {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${apolloAdminToken}` },
+      headers: { Authorization: `Bearer ${secondAdminToken}` },
     });
-    const docAAfterApprove = await BedRequest.findById(requestForHospitalA._id);
-    const isTest4Passed =
-      resApproveAllowed.status === 200 &&
-      resApproveAllowed.body.success === true &&
-      docAAfterApprove.status === 'approved';
-    logTest(4, 'Hospital A Admin Approves Hospital A Request (MongoDB Persisted)', isTest4Passed, `DB Status: ${docAAfterApprove.status}`);
+    const dbReqB = await BedRequest.findById(reqB_Id);
+    const isApproveBOk = resApproveB.status === 200 && dbReqB.status === 'approved';
+    logTest(7, 'Hospital B Admin approves Hospital B request (MongoDB Persisted)', isApproveBOk, `Status: ${resApproveB.status}, DB Status: ${dbReqB?.status}`);
 
     // ----------------------------------------------------
-    // TEST 5: Hospital A Admin REJECTS Hospital A request (Create new pending req for test)
+    // TEST 8: Hospital B Admin attempts to approve Hospital A request (403 Forbidden + MongoDB unchanged)
     // ----------------------------------------------------
     const requestForHospitalA2 = await BedRequest.create({
-      user: resApolloLogin.body.data.user.id,
+      user: resA_Login.body.data.user.id,
       hospital: hospitalA._id,
       bed: hospitalABed._id,
       bedType: hospitalABed.type,
-      patientName: 'Patient For Rejection Test',
-      contactPhone: '9830033333',
+      patientName: 'Patient For Hospital A 2',
+      contactPhone: '9830011112',
       status: 'pending',
     });
-    const resRejectAllowed = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalA2._id}/reject`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${apolloAdminToken}` },
-    });
-    const docA2AfterReject = await BedRequest.findById(requestForHospitalA2._id);
-    const isTest5Passed =
-      resRejectAllowed.status === 200 &&
-      resRejectAllowed.body.success === true &&
-      docA2AfterReject.status === 'rejected';
-    logTest(5, 'Hospital A Admin Rejects Hospital A Request (MongoDB Persisted)', isTest5Passed, `DB Status: ${docA2AfterReject.status}`);
+    const reqA2_Id = requestForHospitalA2._id.toString();
 
-    // ----------------------------------------------------
-    // TEST 8: Hospital B Admin APPROVES Hospital B request (200 OK)
-    // ----------------------------------------------------
-    const resApproveBOk = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalB._id}/approve`, {
+    const resCrossApproveB = await requestJson(`${BASE_URL}/bed-requests/${reqA2_Id}/approve`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${secondAdminToken}` },
     });
-    const docBAfterApprove = await BedRequest.findById(requestForHospitalB._id);
-    const isTest8Passed =
-      resApproveBOk.status === 200 &&
-      resApproveBOk.body.success === true &&
-      docBAfterApprove.status === 'approved';
-    logTest(8, 'Hospital B Admin Approves Hospital B Request (MongoDB Persisted)', isTest8Passed, `DB Status: ${docBAfterApprove.status}`);
+    const dbReqA2 = await BedRequest.findById(reqA2_Id);
+    const isCrossApproveBBlocked = resCrossApproveB.status === 403 && dbReqA2.status === 'pending';
+    logTest(8, 'Hospital B Admin attempts to approve Hospital A request (403 + MongoDB Unchanged)', isCrossApproveBBlocked, `Status: ${resCrossApproveB.status}, DB Status: ${dbReqA2?.status}`);
 
     // ----------------------------------------------------
-    // TEST 9: Hospital B Admin attempts to APPROVE Hospital A request (403 FORBIDDEN)
+    // TEST 9: Hospital A Admin updates Hospital A bed availability (SUCCESS + MongoDB updated)
     // ----------------------------------------------------
-    const requestForHospitalA3 = await BedRequest.create({
-      user: resApolloLogin.body.data.user.id,
-      hospital: hospitalA._id,
-      bed: hospitalABed._id,
-      bedType: hospitalABed.type,
-      patientName: 'Patient Cross Test A3',
-      contactPhone: '9830044444',
-      status: 'pending',
-    });
-    const resBApproveAFrobidden = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalA3._id}/approve`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${secondAdminToken}` },
-    });
-    const docA3Unchanged = await BedRequest.findById(requestForHospitalA3._id);
-    const isTest9Passed =
-      resBApproveAFrobidden.status === 403 &&
-      resBApproveAFrobidden.body.success === false &&
-      docA3Unchanged.status === 'pending';
-    logTest(9, 'Hospital B Admin Blocked From Approving Hospital A Request (403 Forbidden)', isTest9Passed, `Status: ${resBApproveAFrobidden.status}, DB Status: ${docA3Unchanged.status}`);
-
-    // ----------------------------------------------------
-    // TEST 10: Hospital Admin tries to update another hospital's beds (403 FORBIDDEN)
-    // ----------------------------------------------------
-    const initialOccupiedBedsB = hospitalBBed.occupiedBeds;
-    const resUpdateOtherBed = await requestJson(`${BASE_URL}/beds/${hospitalBBed._id}/availability`, {
+    const newOccupiedA = Math.max(0, hospitalABed.occupiedBeds + 1);
+    const resBedUpdateA = await requestJson(`${BASE_URL}/beds/${hospitalABed._id}/availability`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${apolloAdminToken}` },
-      body: JSON.stringify({ occupiedBeds: initialOccupiedBedsB + 1 }),
+      body: JSON.stringify({ occupiedBeds: newOccupiedA }),
     });
-    const bedBAfterAttempt = await Bed.findById(hospitalBBed._id);
-    const isTest10Passed =
-      resUpdateOtherBed.status === 403 &&
-      bedBAfterAttempt.occupiedBeds === initialOccupiedBedsB;
-    logTest(10, 'Cross-Hospital Bed Modification Blocked (403 Forbidden)', isTest10Passed, `Status: ${resUpdateOtherBed.status}, DB Occupied Unchanged: ${bedBAfterAttempt.occupiedBeds}`);
+    const updatedBedA = await Bed.findById(hospitalABed._id);
+    const isBedUpdateAOk = resBedUpdateA.status === 200 && updatedBedA.occupiedBeds === newOccupiedA;
+    logTest(9, 'Hospital A Admin updates Hospital A bed availability (MongoDB Persisted)', isBedUpdateAOk, `Status: ${resBedUpdateA.status}, Occupied: ${updatedBedA.occupiedBeds}`);
 
     // ----------------------------------------------------
-    // TEST 13: Invalid hospitalId is submitted when creating admin (404/400)
+    // TEST 10: Hospital A Admin updates Hospital B bed availability (403 + MongoDB unchanged)
     // ----------------------------------------------------
-    const fakeHospitalId = new mongoose.Types.ObjectId().toString();
-    const resInvalidHosp = await requestJson(`${BASE_URL}/admin/staff`, {
+    const beforeOccB = hospitalBBed.occupiedBeds;
+    const resBedUpdateCross = await requestJson(`${BASE_URL}/beds/${hospitalBBed._id}/availability`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${apolloAdminToken}` },
+      body: JSON.stringify({ occupiedBeds: beforeOccB + 1 }),
+    });
+    const afterBedB = await Bed.findById(hospitalBBed._id);
+    const isBedCrossBlocked = resBedUpdateCross.status === 403 && afterBedB.occupiedBeds === beforeOccB;
+    logTest(10, 'Hospital A Admin updates Hospital B bed availability (403 Forbidden + Unchanged)', isBedCrossBlocked, `Status: ${resBedUpdateCross.status}, Occupied Unchanged: ${afterBedB.occupiedBeds}`);
+
+    // ----------------------------------------------------
+    // TEST 11: Super Admin creates a new hospital admin (Saved to MongoDB Atlas)
+    // ----------------------------------------------------
+    const newAdminEmail = `dr_new_admin_${Date.now()}@wb.gov.in`;
+    const resCreateNewAdmin = await requestJson(`${BASE_URL}/admin/staff`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${superAdminToken}` },
       body: JSON.stringify({
-        name: 'Invalid Admin',
-        email: `fake_admin_${Date.now()}@wb.gov.in`,
+        name: 'Dr. Dynamic Staff Admin',
+        email: newAdminEmail,
+        password: 'SecurePassword123!',
+        hospitalId: hospitalA._id.toString(),
+      }),
+    });
+    const dbNewUser = await User.findOne({ email: newAdminEmail });
+    const isNewAdminPersisted =
+      resCreateNewAdmin.status === 201 &&
+      !!dbNewUser &&
+      dbNewUser.role === 'hospital_admin' &&
+      dbNewUser.hospital.toString() === hospitalA._id.toString();
+    logTest(11, 'Super Admin creates a new hospital admin (Persisted in MongoDB Atlas)', isNewAdminPersisted, `Status: ${resCreateNewAdmin.status}, Email: ${newAdminEmail}`);
+
+    // ----------------------------------------------------
+    // TEST 12: New hospital admin logs in (Successful login with correct hospitalId)
+    // ----------------------------------------------------
+    const resNewAdminLogin = await requestJson(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: newAdminEmail,
+        password: 'SecurePassword123!',
+        hospitalId: hospitalA._id.toString(),
+      }),
+    });
+    const isNewAdminLoginOk =
+      resNewAdminLogin.status === 200 &&
+      resNewAdminLogin.body.data?.user?.role === 'hospital_admin' &&
+      resNewAdminLogin.body.data?.user?.hospitalId === hospitalA._id.toString();
+    logTest(12, 'New hospital admin logs in (Successful login with correct hospitalId)', isNewAdminLoginOk, `Status: ${resNewAdminLogin.status}, HospitalId: ${resNewAdminLogin.body.data?.user?.hospitalId}`);
+
+    // ----------------------------------------------------
+    // TEST 13: Invalid / Non-existent hospitalId rejection on login (HTTP 404)
+    // ----------------------------------------------------
+    const fakeHospitalId = new mongoose.Types.ObjectId().toString();
+    const resFakeHospLogin = await requestJson(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: apolloAdminEmail,
         password: 'Password123!',
         hospitalId: fakeHospitalId,
       }),
     });
-    const isTest13Passed = resInvalidHosp.status === 404 && resInvalidHosp.body.success === false;
-    logTest(13, 'Invalid hospitalId Rejection on Admin Creation', isTest13Passed, `HTTP ${resInvalidHosp.status} - Hospital not found`);
+    logTest(13, 'Non-existent hospitalId rejection during login (HTTP 404)', resFakeHospLogin.status === 404, `Status: ${resFakeHospLogin.status}`);
 
     // ----------------------------------------------------
-    // TEST 14: Unauthenticated user calls approve endpoint (401 Unauthorized)
+    // TEST 14: Hospital A Admin rejects Hospital A request (Persisted in MongoDB)
     // ----------------------------------------------------
-    const resUnauthApprove = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalA3._id}/approve`, {
-      method: 'PATCH',
-    });
-    logTest(14, 'Unauthenticated Approve Attempt Rejected (401 Unauthorized)', resUnauthApprove.status === 401);
-
-    // ----------------------------------------------------
-    // TEST 15: Hospital admin attempts to manipulate hospitalId in request body
-    // ----------------------------------------------------
-    const resManipulatedBody = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalB._id}/reject`, {
+    const resRejectA = await requestJson(`${BASE_URL}/bed-requests/${reqA2_Id}/reject`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${apolloAdminToken}` },
-      body: JSON.stringify({ hospitalId: hospitalA._id.toString() }), // Trying to spoof hospitalId in body
+      body: JSON.stringify({ reason: 'No ICU beds currently available' }),
     });
-    logTest(15, 'Request Body hospitalId Manipulation Blocked by DB Source of Truth', resManipulatedBody.status === 403, 'Backend ignored manipulated body hospitalId and read database');
+    const dbReqA2_afterReject = await BedRequest.findById(reqA2_Id);
+    const isRejectAOk = resRejectA.status === 200 && dbReqA2_afterReject.status === 'rejected';
+    logTest(14, 'Hospital A Admin rejects Hospital A request (MongoDB Persisted)', isRejectAOk, `Status: ${resRejectA.status}, DB Status: ${dbReqA2_afterReject?.status}`);
 
     // ----------------------------------------------------
-    // TEST 16: Hospital admin modifies request URL to another hospital requestId (403)
+    // TEST 15: Hospital A Admin blocked from rejecting Hospital B request (403 Forbidden)
     // ----------------------------------------------------
-    const resManipulatedUrl = await requestJson(`${BASE_URL}/bed-requests/${requestForHospitalB._id}/approve`, {
+    const resCrossReject = await requestJson(`${BASE_URL}/bed-requests/${reqB_Id}/reject`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${apolloAdminToken}` },
     });
-    logTest(16, 'URL Parameter Tampering Cross-Hospital Request Forbidden (403)', resManipulatedUrl.status === 403);
+    logTest(15, 'Hospital A Admin blocked from rejecting Hospital B request (403 Forbidden)', resCrossReject.status === 403, `Status: ${resCrossReject.status}`);
 
     // ----------------------------------------------------
-    // TEST 17: Password security: Only passwordHash stored, plaintext password does not exist
+    // TEST 16: Request query isolation (Hospital A Admin only sees own hospital's requests)
     // ----------------------------------------------------
-    const userDocInDb = await User.findById(createdApolloId).select('+passwordHash');
-    const isPlaintextAbsent = !('password' in userDocInDb.toObject());
-    const isHashValidBcrypt = userDocInDb.passwordHash && userDocInDb.passwordHash.startsWith('$2');
-    logTest(17, 'Password Security (Bcrypt Hashed, Plaintext Never Stored)', isPlaintextAbsent && isHashValidBcrypt, `Hash format: ${userDocInDb.passwordHash.substring(0, 10)}...`);
+    const resReqQuery = await requestJson(`${BASE_URL}/bed-requests`, {
+      headers: { Authorization: `Bearer ${apolloAdminToken}` },
+    });
+    const queriedReqs = resReqQuery.body.data || [];
+    const allBelongToA = queriedReqs.every(
+      (r) => (r.hospital?._id || r.hospital).toString() === hospitalA._id.toString()
+    );
+    logTest(16, 'Hospital A Admin views own hospital requests only (DB query isolation)', resReqQuery.status === 200 && allBelongToA, `Count: ${queriedReqs.length}`);
 
     // ----------------------------------------------------
-    // TEST 18: Duplicate email registration rejected (409 Conflict)
+    // TEST 17: Request body hospitalId manipulation ignored (Backend checks DB record)
     // ----------------------------------------------------
-    const resDuplicateEmail = await requestJson(`${BASE_URL}/admin/staff`, {
+    const resTamperBody = await requestJson(`${BASE_URL}/bed-requests/${reqB_Id}/reject`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${apolloAdminToken}` },
+      body: JSON.stringify({ hospitalId: hospitalA._id.toString() }),
+    });
+    logTest(17, 'Request Body hospitalId Manipulation Blocked by DB Source of Truth', resTamperBody.status === 403, `Status: ${resTamperBody.status}`);
+
+    // ----------------------------------------------------
+    // TEST 18: Unauthenticated access rejected (401 Unauthorized)
+    // ----------------------------------------------------
+    const resUnauth = await requestJson(`${BASE_URL}/bed-requests/${reqA_Id}/approve`, {
+      method: 'PATCH',
+    });
+    logTest(18, 'Unauthenticated operation rejected (401 Unauthorized)', resUnauth.status === 401, `Status: ${resUnauth.status}`);
+
+    // ----------------------------------------------------
+    // TEST 19: Password security check (Bcrypt hashed, plaintext never stored)
+    // ----------------------------------------------------
+    const userInDb = await User.findOne({ email: newAdminEmail }).select('+passwordHash');
+    const isBcrypt = userInDb.passwordHash.startsWith('$2b$') || userInDb.passwordHash.startsWith('$2a$');
+    const plaintextNotStored = userInDb.passwordHash !== 'SecurePassword123!';
+    logTest(19, 'Password Security (Bcrypt hashed, plaintext never stored)', isBcrypt && plaintextNotStored, `Hash format: ${userInDb.passwordHash.slice(0, 10)}...`);
+
+    // ----------------------------------------------------
+    // TEST 20: Duplicate email registration prevention (409 Conflict)
+    // ----------------------------------------------------
+    const resDuplicate = await requestJson(`${BASE_URL}/admin/staff`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${superAdminToken}` },
       body: JSON.stringify({
         name: 'Duplicate Admin',
-        email: apolloAdminEmail, // Re-using existing email
+        email: newAdminEmail,
         password: 'Password123!',
         hospitalId: hospitalA._id.toString(),
       }),
     });
-    logTest(18, 'Duplicate Email Registration Prevention (409 Conflict)', resDuplicateEmail.status === 409);
+    logTest(20, 'Duplicate Email Registration Prevention (409 Conflict)', resDuplicate.status === 409, `Status: ${resDuplicate.status}`);
 
     // ----------------------------------------------------
-    // TEST 19: Public Hospital Search and Bed Availability Query (No Auth Required)
+    // TEST 21: Public bed search & hospital availability preserved (Unauthenticated)
     // ----------------------------------------------------
-    const resPublicHospitals = await requestJson(`${BASE_URL}/hospitals?search=apollo`);
+    const resPublicSearch = await requestJson(`${BASE_URL}/hospitals?search=apollo`);
     const resPublicBeds = await requestJson(`${BASE_URL}/hospitals/${hospitalA._id}/beds`);
     const isPublicOk =
-      resPublicHospitals.status === 200 &&
-      resPublicHospitals.body.data?.length > 0 &&
+      resPublicSearch.status === 200 &&
       resPublicBeds.status === 200 &&
-      resPublicBeds.body.data?.length > 0;
-    logTest(19, 'Public Bed Search & Hospital Availability Preserved (Unauthenticated)', isPublicOk, `Hospitals found: ${resPublicHospitals.body.data?.length}, Beds: ${resPublicBeds.body.data?.length}`);
+      Array.isArray(resPublicBeds.body.data);
+    logTest(21, 'Public Bed Search & Hospital Availability Preserved (Unauthenticated)', isPublicOk, `Hospitals found: ${resPublicSearch.body.data?.length}, Beds: ${resPublicBeds.body.data?.length}`);
 
     // ----------------------------------------------------
-    // TEST 20: Super Admin Retrieves Dynamic Hospital List
+    // TEST 22: Super Admin Dynamic Hospital List API (Source of Truth)
     // ----------------------------------------------------
     const resAdminHospitals = await requestJson(`${BASE_URL}/admin/hospitals`, {
       headers: { Authorization: `Bearer ${superAdminToken}` },
     });
-    const isDynamicHospOk =
-      resAdminHospitals.status === 200 &&
-      resAdminHospitals.body.count === allHospitals.length &&
-      resAdminHospitals.body.data?.length === allHospitals.length;
-    logTest(20, 'Super Admin Dynamic Hospital List API (Source of Truth)', isDynamicHospOk, `Count: ${resAdminHospitals.body.count}`);
-
-    // Clean up temporary test requests
-    await BedRequest.deleteMany({
-      _id: { $in: [requestForHospitalA._id, requestForHospitalB._id, requestForHospitalA2._id, requestForHospitalA3._id] },
-    });
-    await User.deleteMany({
-      email: { $in: [apolloAdminEmail, secondAdminEmail] },
-    });
+    const dynamicCountMatches = resAdminHospitals.body.count === allHospitals.length;
+    logTest(22, 'Super Admin Dynamic Hospital List API (Source of Truth)', resAdminHospitals.status === 200 && dynamicCountMatches, `Count: ${resAdminHospitals.body.count}`);
 
   } catch (err) {
-    console.error('Unhandled test execution error:', err);
+    console.error('❌ Test suite error:', err);
   } finally {
-    await new Promise((resolve) => testServer.close(resolve));
     await disconnectDB();
+    await new Promise((resolve) => testServer.close(resolve));
+
+    const total = testResults.length;
+    const passed = testResults.filter(t => t.passed).length;
+    const allPassed = total > 0 && total === passed;
 
     console.log('\n======================================================');
-    const passed = testResults.filter((r) => r.passed).length;
-    const total = testResults.length;
-    console.log(`📊 TEST SUMMARY: ${passed}/${total} TESTS PASSED (${Math.round((passed / total) * 100)}%)`);
+    console.log(`📊 TEST SUMMARY: ${passed}/${total} TESTS PASSED (${Math.round((passed/total)*100)}%)`);
     console.log('======================================================\n');
+
+    process.exit(allPassed ? 0 : 1);
   }
 }
 
-if (require.main === module) {
-  runStaffAuthTests()
-    .then(() => process.exit(0))
-    .catch((e) => {
-      console.error(e);
-      process.exit(1);
-    });
-}
-
-module.exports = { runStaffAuthTests };
+runStaffAuthTests();

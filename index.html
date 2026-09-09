@@ -865,15 +865,16 @@
     <!-- 1. LOGIN FORM (Shown when unauthenticated) -->
     <div id="staffLoginSection">
       <p>Log in as an authorized hospital administrator to update live bed availability and manage bed requests.</p>
-      <div class="demo-auth-hints">
-        <span>Demo Logins:</span>
-        <button type="button" class="btn btn-outline btn-xs" id="prefillApolloBtn">Apollo Admin</button>
-        <button type="button" class="btn btn-outline btn-xs" id="prefillSuperBtn">Super Admin</button>
-      </div>
       <form id="staffLoginForm" class="portal-form" style="margin-top: 16px;">
         <div class="form-group">
+          <label for="staffHospitalSelect">Hospital</label>
+          <select id="staffHospitalSelect" class="form-control">
+            <option value="">Select Hospital ▼</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="staffEmail">Staff Email</label>
-          <input type="email" id="staffEmail" required placeholder="admin@apollo.wb.gov.in" class="form-control">
+          <input type="email" id="staffEmail" required placeholder="admin@hospital.wb.gov.in" class="form-control">
         </div>
         <div class="form-group">
           <label for="staffPassword">Password</label>
@@ -884,6 +885,11 @@
           <button type="button" class="btn btn-ghost" id="staffLoginCloseBtn">CLOSE</button>
         </div>
       </form>
+      <div class="demo-auth-hints" style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border);">
+        <span style="font-size: 0.8rem; color: var(--muted);">Demo Shortcuts:</span>
+        <button type="button" class="btn btn-outline btn-xs" id="prefillApolloBtn">Apollo Admin</button>
+        <button type="button" class="btn btn-outline btn-xs" id="prefillSuperBtn">Super Admin</button>
+      </div>
     </div>
 
     <!-- 2. STAFF DASHBOARD (Shown when logged in) -->
@@ -1005,7 +1011,7 @@
 <!-- Socket.IO & Leaflet Scripts -->
 <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=2.3"></script>
-<script src="script.js?v=2.3"></script>
+<script src="config.js?v=2.4"></script>
+<script src="script.js?v=2.4"></script>
 </body>
 </html>
