@@ -1475,6 +1475,7 @@
         let recommendedHospitals = [];
         let applicationPriority = 'Emergency assessment';
 
+        let isLiveBackend = false;
         try {
           const res = await fetch(`${API_BASE_URL}/emergency/intake`, {
             method: 'POST',
@@ -1491,12 +1492,12 @@
           if (result.success && result.data) {
             recommendedHospitals = result.data.recommendedHospitals || [];
             applicationPriority = result.data.applicationPriority || 'Emergency assessment';
+            isLiveBackend = true;
           }
         } catch (apiErr) {
           console.warn('Backend unavailable, using emergency fallback matching:', apiErr.message);
           recommendedHospitals = clientSidePrioritizeHospitals(formData);
           applicationPriority = CONDITION_PRIORITY_CONFIG[formData.condition]?.label || 'Emergency assessment';
-          showToast('⚠️ Prioritizing using local demo hospital records.');
         }
 
         // Render recommended hospitals into the single unified hospital list
@@ -1529,7 +1530,11 @@
             hospitalsSection.scrollIntoView({ behavior: 'smooth' });
           }
 
-          showToast('✅ Recommended emergency hospitals prioritized below.');
+          if (isLiveBackend) {
+            showToast('✅ Intake saved to database & suitable hospitals prioritized below.');
+          } else {
+            showToast('⚠️ Backend unreachable (using local demo records). Check connection.');
+          }
         } else {
           renderHospitals([]);
           const hospitalsSection = document.getElementById('hospitals');
