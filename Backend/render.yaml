@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: emergency-bed-tracker-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: Backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: RATE_LIMIT_WINDOW_MINUTES
+        value: 15
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 300
+      - key: CLIENT_URL
+        value: https://harishankarpaul20.github.io
+      - key: ALLOWED_ORIGINS
+        value: https://harishankarpaul20.github.io,http://localhost:5500,http://127.0.0.1:5500

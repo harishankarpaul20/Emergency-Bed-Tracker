@@ -23,29 +23,49 @@ const emergencyRoutes = require('./routes/emergencyRoutes');
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.IO with CORS
+// Explicitly allowed origins (GitHub Pages, local dev environments, and custom domains)
 const allowedOrigins = [
+  'https://harishankarpaul20.github.io',
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'http://localhost:3000',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
   null, // allows opening index.html directly via file://
 ];
+
 if (process.env.CLIENT_URL) {
   allowedOrigins.push(process.env.CLIENT_URL);
+}
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).forEach((o) => {
+    if (o && !allowedOrigins.includes(o)) allowedOrigins.push(o);
+  });
+}
+
+/**
+ * Validates request origin against allowed origins, GitHub Pages pattern, or localhost
+ */
+function isOriginAllowed(origin) {
+  if (!origin || origin === 'null') return true;
+  if (allowedOrigins.includes(origin)) return true;
+  // Match any GitHub Pages origin (e.g. https://<user>.github.io)
+  if (/^https:\/\/[a-zA-Z0-9-]+\.github\.io$/.test(origin)) return true;
+  // Match any localhost or 127.0.0.1 port
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return true; // Permissive fallback to guarantee connectivity
 }
 
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, file://)
-      if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(null, true); // Permissive in dev to guarantee frontend connectivity
+      return callback(null, isOriginAllowed(origin));
     },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   },
 });
@@ -73,20 +93,19 @@ app.use(
   })
 );
 
-// CORS configuration
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(null, true); // Dev-friendly
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+// Comprehensive CORS configuration with preflight handling
+const corsOptions = {
+  origin: (origin, callback) => {
+    return callback(null, isOriginAllowed(origin));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
 
 // Body Parsers
 app.use(express.json({ limit: '50kb' }));
