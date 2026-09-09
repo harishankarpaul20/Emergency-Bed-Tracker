@@ -896,6 +896,81 @@
         <button type="button" class="btn btn-outline btn-xs" id="staffLogoutBtn">🚪 Log Out</button>
       </div>
 
+      <!-- SUPER ADMIN CONTROLS (Visible ONLY when logged in as Super Admin) -->
+      <div id="superAdminSection" hidden style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h3 style="font-size: 1.1rem; margin: 0;">Super Administrator Management</h3>
+            <p class="section-sub" style="font-size: 0.82rem; margin: 2px 0 0;">Provision and oversee hospital administrators across West Bengal.</p>
+          </div>
+          <span class="status-badge available" id="superAdminHospitalCountBadge">🏥 ... Hospitals Tracked</span>
+        </div>
+
+        <!-- ADD HOSPITAL ADMIN FORM -->
+        <div class="admin-panel-card">
+          <h4 style="margin: 0 0 4px; font-size: 0.95rem; color: var(--text);">ADD HOSPITAL ADMIN</h4>
+          <p style="font-size: 0.8rem; color: var(--muted); margin: 0 0 12px;">Create a dedicated hospital administrator for an existing hospital.</p>
+          <form id="createHospitalAdminForm" class="portal-form">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="newAdminName">Admin Name</label>
+                <input type="text" id="newAdminName" required placeholder="e.g. Apollo Administrator" class="form-control">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="newAdminEmail">Staff Email</label>
+                <input type="email" id="newAdminEmail" required placeholder="e.g. admin@apollo.wb.gov.in" class="form-control">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="newAdminPassword">Password</label>
+                <input type="password" id="newAdminPassword" required placeholder="Minimum 6 characters" class="form-control">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="newAdminHospital">Select Hospital</label>
+                <select id="newAdminHospital" required class="form-control">
+                  <option value="">Select Hospital ▼</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top: 14px; text-align: right;">
+              <button type="submit" class="btn btn-primary btn-sm" id="createAdminSubmitBtn">CREATE HOSPITAL ADMIN</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- STAFF ADMINS LIST -->
+        <div class="admin-panel-card">
+          <h4 style="margin: 0 0 4px; font-size: 0.95rem; color: var(--text);">STAFF ADMINS</h4>
+          <p style="font-size: 0.8rem; color: var(--muted); margin: 0 0 12px;">Registered hospital administrators and their healthcare facility assignments.</p>
+          <div class="table-responsive">
+            <table class="staff-table" id="staffAdminsTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Staff Email</th>
+                  <th>Hospital</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="staffAdminsTableBody">
+                <tr><td colspan="6" style="text-align: center; color: var(--muted);">Loading staff administrators...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUPER ADMIN VIEW SWITCHER -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--border);">
+          <h4 style="font-size: 0.95rem; margin: 0;">Facility Bed Capacity &amp; Incoming Requests</h4>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="superAdminHospSelect" style="font-size: 0.82rem; margin: 0; font-weight: 600;">Inspect Hospital:</label>
+            <select id="superAdminHospSelect" class="form-control" style="width: auto; min-width: 220px; padding: 4px 8px; font-size: 0.85rem;">
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="staff-dash-tabs">
         <h3 style="font-size: 1.05rem; margin-top: 16px;">Bed Inventory &amp; Live Capacity</h3>
         <p class="section-sub" style="font-size: 0.82rem; margin-bottom: 12px;">Saved changes broadcast instantly to connected ambulance dispatchers and citizen dashboards.</p>
@@ -930,7 +1005,7 @@
 <!-- Socket.IO & Leaflet Scripts -->
 <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=2.2"></script>
-<script src="script.js?v=2.2"></script>
+<script src="config.js?v=2.3"></script>
+<script src="script.js?v=2.3"></script>
 </body>
 </html>

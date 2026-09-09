@@ -124,6 +124,16 @@
   const prefillSuperBtn = document.getElementById('prefillSuperBtn');
   const navStaffPortalBtn = document.getElementById('navStaffPortalBtn');
   const mobileStaffPortalBtn = document.getElementById('mobileStaffPortalBtn');
+  const superAdminSection = document.getElementById('superAdminSection');
+  const superAdminHospitalCountBadge = document.getElementById('superAdminHospitalCountBadge');
+  const createHospitalAdminForm = document.getElementById('createHospitalAdminForm');
+  const newAdminName = document.getElementById('newAdminName');
+  const newAdminEmail = document.getElementById('newAdminEmail');
+  const newAdminPassword = document.getElementById('newAdminPassword');
+  const newAdminHospital = document.getElementById('newAdminHospital');
+  const createAdminSubmitBtn = document.getElementById('createAdminSubmitBtn');
+  const staffAdminsTableBody = document.getElementById('staffAdminsTableBody');
+  const superAdminHospSelect = document.getElementById('superAdminHospSelect');
 
   /* -----------------------------------------------------
      4. API CLIENT & HTTP UTILITIES
@@ -712,30 +722,141 @@
     staffAuthBadge.className = 'status-badge';
   }
 
+  let currentSuperAdminHospId = null;
+
   async function renderStaffDashboard() {
     staffLoginSection.hidden = true;
     staffDashboardSection.hidden = false;
-    staffAuthBadge.textContent = `🟢 ${currentUser.role === 'super_admin' ? 'SUPER ADMIN' : 'HOSPITAL ADMIN'}`;
+
+    const isSuper = currentUser.role === 'super_admin';
+    staffAuthBadge.textContent = isSuper ? '🟢 SUPER ADMIN' : '🟢 HOSPITAL ADMIN';
     staffAuthBadge.className = 'status-badge available';
 
-    staffUserEmail.textContent = `${currentUser.email} (${currentUser.name})`;
-    const targetHosp = currentUser.hospital || hospitals[0];
-    staffHospName.textContent = targetHosp.name || 'Assigned Hospital Network';
+    staffUserEmail.textContent = `${currentUser.email} (${currentUser.name} — ${isSuper ? 'State Administrator' : 'Hospital Administrator'})`;
 
-    // Fetch live beds for this hospital
-    try {
+    if (isSuper) {
+      if (superAdminSection) superAdminSection.hidden = false;
+      await initSuperAdminDashboard();
+    } else {
+      if (superAdminSection) superAdminSection.hidden = true;
+      const targetHosp = currentUser.hospital || hospitals[0];
+      staffHospName.textContent = targetHosp.name || 'Assigned Hospital Network';
       const hospId = targetHosp._id || targetHosp.id;
+      loadHospitalBedsAndRequests(hospId);
+    }
+  }
+
+  async function initSuperAdminDashboard() {
+    try {
+      // 1. Fetch dynamic hospital list for dropdown and count
+      const res = await apiRequest('/admin/hospitals');
+      const adminHospitals = res.data || [];
+      const totalCount = res.count !== undefined ? res.count : adminHospitals.length;
+
+      if (superAdminHospitalCountBadge) {
+        superAdminHospitalCountBadge.textContent = `🏥 ${totalCount} Hospitals in Network`;
+      }
+
+      // Populate newAdminHospital dropdown dynamically
+      if (newAdminHospital) {
+        newAdminHospital.innerHTML = '<option value="">Select Hospital ▼</option>' +
+          adminHospitals.map(h => `<option value="${h.id || h._id}">${escapeHtml(h.name)} (${escapeHtml(h.district)})</option>`).join('');
+      }
+
+      // Populate superAdminHospSelect dropdown for inspecting beds
+      if (superAdminHospSelect) {
+        superAdminHospSelect.innerHTML = adminHospitals.map(h => `<option value="${h.id || h._id}">${escapeHtml(h.name)} (${escapeHtml(h.district)})</option>`).join('');
+        if (!currentSuperAdminHospId && adminHospitals.length > 0) {
+          currentSuperAdminHospId = adminHospitals[0].id || adminHospitals[0]._id;
+        }
+        if (currentSuperAdminHospId) {
+          superAdminHospSelect.value = currentSuperAdminHospId;
+        }
+      }
+
+      // Set current viewed hospital header
+      const activeHospObj = adminHospitals.find(h => (h.id || h._id) === currentSuperAdminHospId) || adminHospitals[0];
+      staffHospName.textContent = activeHospObj ? activeHospObj.name : 'State Hospital Network';
+
+      // 2. Load staff list
+      await loadStaffAdminsList();
+
+      // 3. Load beds & requests for active hospital
+      if (currentSuperAdminHospId) {
+        loadHospitalBedsAndRequests(currentSuperAdminHospId);
+      }
+    } catch (err) {
+      console.warn('Super Admin init note:', err.message);
+    }
+  }
+
+  async function loadStaffAdminsList() {
+    if (!staffAdminsTableBody) return;
+    try {
+      const res = await apiRequest('/admin/staff');
+      const staffList = res.data || [];
+
+      if (!staffList.length) {
+        staffAdminsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 16px;">No staff administrators registered yet.</td></tr>';
+        return;
+      }
+
+      staffAdminsTableBody.innerHTML = staffList.map(u => {
+        const hospName = u.hospital ? (u.hospital.name || 'Assigned Facility') : (u.role === 'super_admin' ? 'Global (All Facilities)' : 'None');
+        const isSuper = u.role === 'super_admin';
+        return `
+          <tr data-user-id="${u._id || u.id}">
+            <td><strong>${escapeHtml(u.name)}</strong></td>
+            <td>${escapeHtml(u.email)}</td>
+            <td>${escapeHtml(hospName)}</td>
+            <td><span class="status-badge ${isSuper ? 'available' : ''}">${escapeHtml(u.role)}</span></td>
+            <td><span class="status-badge ${u.isActive ? 'available' : 'full'}">${u.isActive ? '🟢 Active' : '⚪ Inactive'}</span></td>
+            <td>
+              ${isSuper ? '<span style="font-size: 0.8rem; color: var(--muted);">Protected</span>' : `
+                <button type="button" class="btn btn-outline btn-xs toggle-staff-status-btn" data-id="${u._id || u.id}" data-active="${u.isActive}">
+                  ${u.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Wire toggle buttons
+      staffAdminsTableBody.querySelectorAll('.toggle-staff-status-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.dataset.id;
+          const currentActive = btn.dataset.active === 'true';
+          try {
+            await apiRequest(`/admin/staff/${userId}/status`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive: !currentActive }),
+            });
+            showToast(`Staff account ${!currentActive ? 'activated' : 'deactivated'}.`);
+            await loadStaffAdminsList();
+          } catch (e) {
+            showToast(`❌ ${e.message}`);
+          }
+        });
+      });
+    } catch (err) {
+      staffAdminsTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 16px;">Failed to load staff accounts: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  async function loadHospitalBedsAndRequests(hospId) {
+    try {
       const bedsRes = await apiRequest(`/hospitals/${hospId}/beds`);
       renderStaffBedTable(bedsRes.data || []);
-      loadStaffBedRequests();
+      loadStaffBedRequests(hospId);
     } catch (err) {
-      console.warn('Failed to load beds for staff view:', err.message);
+      console.warn('Failed to load hospital beds:', err.message);
     }
   }
 
   function renderStaffBedTable(beds) {
     if (!beds.length) {
-      staffBedTableBody.innerHTML = '<tr><td colspan="6">No bed inventory records found.</td></tr>';
+      staffBedTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: var(--muted);">No bed inventory records found for this facility.</td></tr>';
       return;
     }
 
@@ -779,23 +900,29 @@
         body: JSON.stringify({ occupiedBeds: newOccupied })
       });
       showToast('⚡ Live bed capacity updated.');
-      renderStaffDashboard();
+      const activeHospId = (currentUser.role === 'super_admin') ? currentSuperAdminHospId : (currentUser.hospital?._id || currentUser.hospitalId || currentUser.hospital);
+      if (activeHospId) {
+        loadHospitalBedsAndRequests(activeHospId);
+      } else {
+        renderStaffDashboard();
+      }
       fetchHospitalsFromBackend();
     } catch (err) {
       showToast(`❌ Error: ${err.message}`);
     }
   }
 
-  async function loadStaffBedRequests() {
+  async function loadStaffBedRequests(hospId = null) {
     try {
-      const res = await apiRequest('/bed-requests');
+      const url = (currentUser.role === 'super_admin' && hospId) ? `/bed-requests?hospital=${hospId}` : '/bed-requests';
+      const res = await apiRequest(url);
       const reqs = res.data || [];
       if (!reqs.length) {
-        staffRequestsContainer.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">No bed requests found.</p>';
+        staffRequestsContainer.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">No bed requests found for this facility.</p>';
         return;
       }
 
-      staffRequestsContainer.innerHTML = reqs.slice(0, 5).map(r => `
+      staffRequestsContainer.innerHTML = reqs.slice(0, 10).map(r => `
         <div class="staff-req-card" data-req-id="${r._id}">
           <div class="staff-req-info">
             <h4>${escapeHtml(r.patientName)} · <span class="status-badge ${r.status}">${escapeHtml(r.status.toUpperCase())}</span></h4>
@@ -816,7 +943,7 @@
           try {
             await apiRequest(`/bed-requests/${btn.dataset.id}/approve`, { method: 'PATCH' });
             showToast('✅ Bed request approved.');
-            loadStaffBedRequests();
+            loadStaffBedRequests(hospId);
             fetchHospitalsFromBackend();
           } catch (e) { showToast(`❌ ${e.message}`); }
         });
@@ -827,7 +954,7 @@
           try {
             await apiRequest(`/bed-requests/${btn.dataset.id}/reject`, { method: 'PATCH' });
             showToast('Bed request rejected. Bed released back to pool.');
-            loadStaffBedRequests();
+            loadStaffBedRequests(hospId);
             fetchHospitalsFromBackend();
           } catch (e) { showToast(`❌ ${e.message}`); }
         });
@@ -835,6 +962,50 @@
     } catch (err) {
       staffRequestsContainer.innerHTML = `<p style="color: var(--muted); font-size: 0.88rem;">No requests currently available.</p>`;
     }
+  }
+
+  // Super Admin Event Listeners
+  if (superAdminHospSelect) {
+    superAdminHospSelect.addEventListener('change', () => {
+      currentSuperAdminHospId = superAdminHospSelect.value;
+      const selectedOpt = superAdminHospSelect.options[superAdminHospSelect.selectedIndex];
+      staffHospName.textContent = selectedOpt ? selectedOpt.textContent.split(' (')[0] : 'Selected Hospital';
+      loadHospitalBedsAndRequests(currentSuperAdminHospId);
+    });
+  }
+
+  if (createHospitalAdminForm) {
+    createHospitalAdminForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = newAdminName.value.trim();
+      const email = newAdminEmail.value.trim();
+      const password = newAdminPassword.value;
+      const hospitalId = newAdminHospital.value;
+
+      if (!name || !email || !password || !hospitalId) {
+        showToast('Please fill in all required fields.');
+        return;
+      }
+
+      createAdminSubmitBtn.disabled = true;
+      createAdminSubmitBtn.textContent = '⏳ Creating...';
+
+      try {
+        const res = await apiRequest('/admin/staff', {
+          method: 'POST',
+          body: JSON.stringify({ name, email, password, hospitalId }),
+        });
+
+        showToast(res.message || '✅ Hospital administrator created successfully.');
+        createHospitalAdminForm.reset();
+        await loadStaffAdminsList();
+      } catch (err) {
+        showToast(`❌ ${err.message}`);
+      } finally {
+        createAdminSubmitBtn.disabled = false;
+        createAdminSubmitBtn.textContent = 'CREATE HOSPITAL ADMIN';
+      }
+    });
   }
 
   // Staff Login Submission

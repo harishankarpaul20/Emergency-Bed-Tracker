@@ -90,7 +90,7 @@ const verifyHospitalOwnership = async (req, res, next) => {
     if (!isAuthorized) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden. You do not have permission to manage this hospital.',
+        message: 'Unauthorized: You can only manage resources for your own hospital.',
         errors: [],
       });
     }
@@ -102,9 +102,25 @@ const verifyHospitalOwnership = async (req, res, next) => {
   }
 };
 
+/**
+ * Pure authorization check for hospital resource access
+ * Super admin has global access; hospital admin is strictly limited to their own hospital.
+ */
+function isUserAdminForHospital(user, targetHospitalId) {
+  if (!user) return false;
+  if (user.role === 'super_admin') return true;
+  if (user.role === 'hospital_admin') {
+    const userHospId = (user.hospitalId || (user.hospital && user.hospital._id ? user.hospital._id : user.hospital))?.toString();
+    const targetId = (targetHospitalId && targetHospitalId._id ? targetHospitalId._id : targetHospitalId)?.toString();
+    return Boolean(userHospId && targetId && userHospId === targetId);
+  }
+  return false;
+}
+
 module.exports = {
   authorize,
   superAdminOnly,
   hospitalAdminOrSuper,
   verifyHospitalOwnership,
+  isUserAdminForHospital,
 };

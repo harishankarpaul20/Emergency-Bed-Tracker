@@ -12,9 +12,12 @@ const {
  * Check if the user is authorized to manage bed requests for a hospital
  */
 function isUserAdminForHospital(user, hospitalId) {
+  if (!user) return false;
   if (user.role === 'super_admin') return true;
   if (user.role === 'hospital_admin') {
-    return user.hospital && user.hospital.toString() === hospitalId.toString();
+    const userHospId = (user.hospitalId || (user.hospital && user.hospital._id ? user.hospital._id : user.hospital))?.toString();
+    const targetId = (hospitalId && hospitalId._id ? hospitalId._id : hospitalId)?.toString();
+    return Boolean(userHospId && targetId && userHospId === targetId);
   }
   return false;
 }
@@ -60,14 +63,15 @@ const getBedRequests = async (req, res, next) => {
     if (req.user.role === 'user') {
       filter.user = req.user._id;
     } else if (req.user.role === 'hospital_admin') {
-      if (!req.user.hospital) {
+      const userHosp = req.user.hospitalId || req.user.hospital;
+      if (!userHosp) {
         return res.status(200).json({
           success: true,
           data: [],
           message: 'No hospital assigned to this administrator account.',
         });
       }
-      filter.hospital = req.user.hospital;
+      filter.hospital = userHosp;
     } else if (req.user.role === 'super_admin') {
       if (req.query.hospital) filter.hospital = req.query.hospital;
     }
@@ -150,7 +154,7 @@ const approveBedRequest = async (req, res, next) => {
     if (!isUserAdminForHospital(req.user, reqDoc.hospital)) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden. You do not administer this hospital.',
+        message: 'Unauthorized: You can only manage requests for your own hospital.',
         errors: [],
       });
     }
@@ -186,7 +190,7 @@ const rejectBedRequest = async (req, res, next) => {
     if (!isUserAdminForHospital(req.user, reqDoc.hospital)) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden. You do not administer this hospital.',
+        message: 'Unauthorized: You can only manage requests for your own hospital.',
         errors: [],
       });
     }
@@ -225,7 +229,7 @@ const cancelBedRequest = async (req, res, next) => {
     if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden. You cannot cancel this request.',
+        message: 'Unauthorized: You can only manage requests for your own hospital.',
         errors: [],
       });
     }

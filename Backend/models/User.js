@@ -29,8 +29,8 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: [true, 'Please provide a phone number'],
       trim: true,
+      default: '',
     },
     role: {
       type: String,
@@ -52,8 +52,20 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual for hospitalId referencing hospital ObjectId
+userSchema.virtual('hospitalId')
+  .get(function () {
+    if (!this.hospital) return null;
+    return this.hospital._id ? this.hospital._id.toString() : this.hospital.toString();
+  })
+  .set(function (val) {
+    this.hospital = val;
+  });
 
 // Pre-save hook to hash password before saving (Mongoose 8 async)
 userSchema.pre('save', async function () {
@@ -74,9 +86,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // Safe JSON serialization (never include passwordHash)
 userSchema.methods.toJSON = function () {
-  const obj = this.toObject();
+  const obj = this.toObject({ virtuals: true });
   delete obj.passwordHash;
   delete obj.__v;
+  obj.hospitalId = this.hospital ? (this.hospital._id ? this.hospital._id.toString() : this.hospital.toString()) : null;
   return obj;
 };
 

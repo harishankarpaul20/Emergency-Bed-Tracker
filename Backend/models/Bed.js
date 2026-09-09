@@ -51,8 +51,16 @@ const bedSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual for hospitalId referencing hospital ObjectId
+bedSchema.virtual('hospitalId').get(function () {
+  if (!this.hospital) return null;
+  return this.hospital._id ? this.hospital._id.toString() : this.hospital.toString();
+});
 
 // Compound unique index: A hospital can have only one record per bed category
 bedSchema.index({ hospital: 1, type: 1 }, { unique: true });

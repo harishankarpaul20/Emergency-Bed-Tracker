@@ -62,8 +62,16 @@ const bedRequestSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual for hospitalId referencing hospital ObjectId
+bedRequestSchema.virtual('hospitalId').get(function () {
+  if (!this.hospital) return null;
+  return this.hospital._id ? this.hospital._id.toString() : this.hospital.toString();
+});
 
 // Indexes for query performance
 bedRequestSchema.index({ hospital: 1, status: 1 });

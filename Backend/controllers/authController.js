@@ -45,6 +45,7 @@ const register = async (req, res, next) => {
           phone: user.phone,
           role: user.role,
           hospital: user.hospital,
+          hospitalId: user.hospital ? (user.hospital._id ? user.hospital._id.toString() : user.hospital.toString()) : null,
         },
       },
     });
@@ -105,6 +106,7 @@ const login = async (req, res, next) => {
           phone: user.phone,
           role: user.role,
           hospital: user.hospital,
+          hospitalId: user.hospital ? (user.hospital._id ? user.hospital._id.toString() : user.hospital.toString()) : null,
         },
       },
     });
@@ -134,6 +136,7 @@ const getMe = async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         hospital: user.hospital,
+        hospitalId: user.hospital ? (user.hospital._id ? user.hospital._id.toString() : user.hospital.toString()) : null,
         createdAt: user.createdAt,
       },
     });

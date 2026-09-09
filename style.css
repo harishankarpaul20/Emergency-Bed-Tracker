@@ -1389,4 +1389,95 @@ button { font-family: inherit; }
   }
 }
 
+/* Staff Portal & Super Admin Management Styles */
+.staff-dash-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin-top: 8px;
+}
+
+.staff-table th {
+  background: var(--bg-alt, #f8fafc);
+  color: var(--muted, #64748b);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.staff-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.staff-table tr:hover {
+  background: var(--bg-hover, #f1f5f9);
+}
+
+.admin-panel-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.bed-counter-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bed-counter-ctrl button {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.staff-req-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  gap: 12px;
+  background: #fafafa;
+}
+
+.staff-req-info h4 {
+  margin: 0 0 4px;
+  font-size: 0.92rem;
+}
+
+.staff-req-info p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.staff-req-actions {
+  display: flex;
+  gap: 6px;
+}
+
+
 

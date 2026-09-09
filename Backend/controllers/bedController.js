@@ -6,13 +6,16 @@ const { broadcastBedUpdate } = require('../services/bedService');
  * Check if the current user is authorized to manage beds for the given hospital
  */
 function isUserAuthorizedForHospital(user, hospital) {
+  if (!user) return false;
   if (user.role === 'super_admin') return true;
   if (user.role === 'hospital_admin') {
-    const userHospId = user.hospital ? user.hospital.toString() : null;
-    const hospAdminId = hospital.admin ? hospital.admin.toString() : null;
+    const userHospId = (user.hospitalId || (user.hospital && user.hospital._id ? user.hospital._id : user.hospital))?.toString();
+    const hospId = (hospital && hospital._id ? hospital._id : hospital)?.toString();
+    const hospAdminId = (hospital && hospital.admin && hospital.admin._id ? hospital.admin._id : hospital?.admin)?.toString();
+    const currentUserId = user._id ? user._id.toString() : null;
     return (
-      (userHospId && userHospId === hospital._id.toString()) ||
-      (hospAdminId && hospAdminId === user._id.toString())
+      Boolean(userHospId && hospId && userHospId === hospId) ||
+      Boolean(hospAdminId && currentUserId && hospAdminId === currentUserId)
     );
   }
   return false;
@@ -169,7 +172,7 @@ const updateBed = async (req, res, next) => {
     if (!hospital || !isUserAuthorizedForHospital(req.user, hospital)) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden. You are not authorized to update beds for this hospital.',
+        message: 'Unauthorized: You can only manage beds for your own hospital.',
         errors: [],
       });
     }
@@ -229,7 +232,7 @@ const patchBedAvailability = async (req, res, next) => {
     if (!hospital || !isUserAuthorizedForHospital(req.user, hospital)) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden. You are not authorized to update beds for this hospital.',
+        message: 'Unauthorized: You can only manage beds for your own hospital.',
         errors: [],
       });
     }
