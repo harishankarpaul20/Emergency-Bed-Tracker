@@ -327,6 +327,17 @@
     const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.name + ', ' + (h.address || h.area))}`;
     const targetId = h._id || h.id;
 
+    const matchChips = (h.matchReasons && h.matchReasons.length > 0)
+      ? `
+        <div class="hc-match-badge" title="Clinical match criteria">
+          <span>🎯 Prioritized Match:</span>
+        </div>
+        <div class="hc-match-reasons">
+          ${h.matchReasons.slice(0, 3).map(r => `<span class="hc-match-chip">✓ ${escapeHtml(r)}</span>`).join('')}
+        </div>
+      `
+      : '';
+
     return `
       <article class="hospital-card" data-id="${targetId}" tabindex="0" aria-label="${escapeHtml(h.name)}">
         <div class="hc-top">
@@ -342,7 +353,9 @@
           <span class="status-badge ${h.status}">${statusLabel}</span>
         </div>
 
-        <div class="hc-meta">
+        ${matchChips}
+
+        <div class="hc-meta" style="${matchChips ? 'margin-top: 10px;' : ''}">
           <span>📍 ${escapeHtml(h.district)}</span>
           <span>📍 ${escapeHtml(h.area)}</span>
           <span>${typeof h.distance === 'number' ? h.distance.toFixed(1) : '3.5'} km away</span>
@@ -1431,6 +1444,8 @@
       e.preventDefault();
 
       const selectedConditionEl = document.querySelector('input[name="patientCondition"]:checked');
+      const selectedAmbulanceEl = document.querySelector('input[name="intakeAmbulance"]:checked');
+
       const formData = {
         patientName: document.getElementById('intakePatientName').value.trim(),
         age: document.getElementById('intakeAge').value.trim(),
@@ -1439,7 +1454,7 @@
         attendantName: document.getElementById('intakeAttendant').value.trim(),
         district: document.getElementById('intakeDistrict').value,
         area: document.getElementById('intakeArea').value.trim(),
-        ambulanceRequired: document.getElementById('intakeAmbulance').value,
+        ambulanceRequired: selectedAmbulanceEl ? selectedAmbulanceEl.value : 'Not Sure',
         emergencyType: document.getElementById('intakeEmergencyType').value,
         condition: selectedConditionEl ? selectedConditionEl.value : '',
         symptoms: document.getElementById('intakeSymptoms').value.trim(),
@@ -1455,7 +1470,6 @@
       intakeSubmitBtn.textContent = '⏳ Processing Emergency Intake...';
       if (intakeLoadingBox) intakeLoadingBox.hidden = false;
       if (intakeAlertBox) intakeAlertBox.hidden = true;
-      if (intakeResultsContainer) intakeResultsContainer.hidden = true;
 
       try {
         let recommendedHospitals = [];
@@ -1485,41 +1499,42 @@
           showToast('⚠️ Prioritizing using local demo hospital records.');
         }
 
-        // Render recommended hospital cards
+        // Render recommended hospitals into the single unified hospital list
         if (recommendedHospitals && recommendedHospitals.length > 0) {
-          intakeHospitalGrid.innerHTML = recommendedHospitals.map(renderRecommendedCard).join('');
-          intakeHospitalGrid.hidden = false;
-          intakeEmptyState.hidden = true;
+          renderHospitals(recommendedHospitals);
 
-          // Wire view details and book buttons on the matched cards
-          intakeHospitalGrid.querySelectorAll('.view-details-btn').forEach(btn => {
-            btn.addEventListener('click', () => showHospitalDetails(btn.dataset.id));
-          });
+          // Update priority notification banner in the hospital results section
+          const intakePriorityBanner = document.getElementById('intakePriorityBanner');
+          const intakePriorityBannerText = document.getElementById('intakePriorityBannerText');
+          const hospitalsEyebrow = document.getElementById('hospitalsEyebrow');
+          const hospitalsHeading = document.getElementById('hospitals-heading');
 
-          intakeHospitalGrid.querySelectorAll('.card-req-btn').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              openBedRequestModal(btn.dataset.id);
-            });
-          });
+          if (intakePriorityBanner && intakePriorityBannerText) {
+            intakePriorityBanner.hidden = false;
+            intakePriorityBannerText.innerHTML = `Prioritized for <strong>${escapeHtml(formData.emergencyType)}</strong> with Application Priority: <strong>${escapeHtml(applicationPriority)}</strong>. Hospitals are ranked based on emergency capability, bed availability, and district proximity.`;
+          }
+          if (hospitalsEyebrow) hospitalsEyebrow.textContent = 'RECOMMENDED EMERGENCY CARE';
+          if (hospitalsHeading) hospitalsHeading.textContent = 'Nearby / Suitable Hospitals';
 
-          if (successPriorityText) {
-            successPriorityText.textContent = applicationPriority;
+          // Sync search controls with patient's location
+          if (formData.district && filterDistrict) {
+            filterDistrict.value = formData.district;
+            populateCityDropdown(formData.district);
+            syncDistrictChips(formData.district);
           }
 
-          if (intakeResultsContainer) {
-            intakeResultsContainer.hidden = false;
-            intakeResultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Smoothly scroll down to Hospital Results
+          const hospitalsSection = document.getElementById('hospitals');
+          if (hospitalsSection) {
+            hospitalsSection.scrollIntoView({ behavior: 'smooth' });
           }
 
-          showToast('✅ Emergency intake processed. Recommended hospitals prioritized.');
+          showToast('✅ Recommended emergency hospitals prioritized below.');
         } else {
-          intakeHospitalGrid.innerHTML = '';
-          intakeHospitalGrid.hidden = true;
-          intakeEmptyState.hidden = false;
-          if (intakeResultsContainer) {
-            intakeResultsContainer.hidden = false;
-            intakeResultsContainer.scrollIntoView({ behavior: 'smooth' });
+          renderHospitals([]);
+          const hospitalsSection = document.getElementById('hospitals');
+          if (hospitalsSection) {
+            hospitalsSection.scrollIntoView({ behavior: 'smooth' });
           }
         }
       } catch (err) {
@@ -1530,7 +1545,7 @@
         }
       } finally {
         intakeSubmitBtn.disabled = false;
-        intakeSubmitBtn.textContent = '🔍 FIND SUITABLE HOSPITALS';
+        intakeSubmitBtn.textContent = '🚨 FIND SUITABLE HOSPITALS';
         if (intakeLoadingBox) intakeLoadingBox.hidden = true;
       }
     });
@@ -1543,8 +1558,18 @@
         document.querySelectorAll('.field-error-msg').forEach(el => (el.hidden = true));
         document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
         if (intakeAlertBox) intakeAlertBox.hidden = true;
-        if (intakeResultsContainer) intakeResultsContainer.hidden = true;
-        showToast('Intake form cleared.');
+
+        const intakePriorityBanner = document.getElementById('intakePriorityBanner');
+        if (intakePriorityBanner) intakePriorityBanner.hidden = true;
+
+        const hospitalsEyebrow = document.getElementById('hospitalsEyebrow');
+        if (hospitalsEyebrow) hospitalsEyebrow.textContent = 'Results';
+
+        const hospitalsHeading = document.getElementById('hospitals-heading');
+        if (hospitalsHeading) hospitalsHeading.textContent = 'Hospital Availability & Emergency Care';
+
+        renderHospitals(hospitals.slice().sort((a, b) => (a.distance || 0) - (b.distance || 0)));
+        showToast('Intake form cleared. All hospitals restored.');
       });
     }
   }

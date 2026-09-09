@@ -957,6 +957,32 @@ button { font-family: inherit; }
   display: none;
 }
 
+/* Ambulance Radio Options */
+.ambulance-radio-group {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.ambulance-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--secondary);
+  user-select: none;
+}
+
+.ambulance-radio-label input[type="radio"] {
+  accent-color: var(--primary);
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+}
+
 /* Condition Cards Grid */
 .condition-cards-grid {
   display: grid;

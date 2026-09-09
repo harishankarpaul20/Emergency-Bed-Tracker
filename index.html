@@ -246,31 +246,11 @@
     </div>
   </section>
 
-  <!-- ================= 6 & 7. HOSPITAL SEARCH RESULTS / CARDS ================= -->
-  <section class="hospitals-section" id="hospitals" aria-labelledby="hospitals-heading">
-    <div class="section-inner">
-      <div class="section-heading">
-        <p class="eyebrow">Results</p>
-        <h2 id="hospitals-heading">Demo hospital availability</h2>
-        <p class="section-sub">All bed counts are demo/sample data. Confirm directly with the hospital before traveling.</p>
-      </div>
-
-      <div class="hospital-grid" id="hospitalGrid" aria-live="polite"></div>
-
-      <div class="empty-state" id="emptyState" hidden>
-        <span class="empty-icon" aria-hidden="true">🔍</span>
-        <h3>No matching hospitals found</h3>
-        <p>Try selecting another district, city or bed type.</p>
-        <button class="btn btn-outline" id="emptyClearBtn" type="button">CLEAR ALL FILTERS</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= 7B. EMERGENCY PATIENT INTAKE ================= -->
+  <!-- ================= 7. EMERGENCY PATIENT INFORMATION ================= -->
   <section class="emergency-intake-section" id="emergency-patient-intake" aria-labelledby="intake-heading">
     <div class="section-inner">
       <div class="section-heading">
-        <p class="eyebrow">Emergency Intake & Prioritization</p>
+        <p class="eyebrow">Emergency Intake</p>
         <h2 id="intake-heading">Emergency Patient Information</h2>
         <p class="section-sub">Provide basic patient and emergency details to help identify suitable emergency-care options.</p>
       </div>
@@ -354,14 +334,23 @@
             <input type="text" id="intakeArea" class="form-control" placeholder="e.g. Salt Lake, Kankurgachi, Howrah, Siliguri">
           </div>
 
-          <!-- Field 9: Ambulance Required? -->
+          <!-- Field 9: Ambulance Required? (Radio Options) -->
           <div class="form-group">
-            <label for="intakeAmbulance">Ambulance Required? <span class="required-star" aria-hidden="true">*</span></label>
-            <select id="intakeAmbulance" class="form-control" required>
-              <option value="Not Sure">Not Sure</option>
-              <option value="Yes">Yes — Ambulance Required</option>
-              <option value="No">No — Self Transport</option>
-            </select>
+            <label>Ambulance Required? <span class="required-star" aria-hidden="true">*</span></label>
+            <div class="ambulance-radio-group" role="radiogroup" aria-label="Ambulance Required">
+              <label class="ambulance-radio-label">
+                <input type="radio" name="intakeAmbulance" value="Yes">
+                <span>Yes</span>
+              </label>
+              <label class="ambulance-radio-label">
+                <input type="radio" name="intakeAmbulance" value="No">
+                <span>No</span>
+              </label>
+              <label class="ambulance-radio-label">
+                <input type="radio" name="intakeAmbulance" value="Not Sure" checked>
+                <span>Not Sure</span>
+              </label>
+            </div>
             <span class="field-error-msg" id="errAmbulance" hidden></span>
           </div>
 
@@ -469,7 +458,7 @@
         <!-- Submission Row -->
         <div class="intake-submit-row">
           <button type="submit" class="btn btn-primary btn-lg" id="intakeSubmitBtn">
-            🔍 FIND SUITABLE HOSPITALS
+            🚨 FIND SUITABLE HOSPITALS
           </button>
           <button type="button" class="btn btn-outline" id="intakeResetBtn">CLEAR FORM</button>
         </div>
@@ -486,47 +475,44 @@
         <!-- Global Inline Error -->
         <div class="intake-alert-box alert-danger" id="intakeAlertBox" hidden role="alert"></div>
       </form>
+    </div>
+  </section>
 
-      <!-- ================= RECOMMENDED HOSPITALS RESULTS ================= -->
-      <div class="intake-results-container" id="intakeResultsContainer" hidden>
-        <div class="intake-results-header">
-          <div class="section-heading">
-            <p class="eyebrow">Prioritized Emergency Options</p>
-            <h3 id="recommendedHeading">Recommended Emergency Hospitals</h3>
-            <p class="section-sub">Results are prioritized using the information provided. Confirm availability and suitability directly with the hospital.</p>
-          </div>
+  <!-- ================= 8. HOSPITAL RESULTS ================= -->
+  <section class="hospitals-section" id="hospitals" aria-labelledby="hospitals-heading">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow" id="hospitalsEyebrow">Nearby / Suitable Hospitals</p>
+        <h2 id="hospitals-heading">Hospital Availability & Emergency Care</h2>
+        <p class="section-sub" id="hospitalsSub">All bed counts are demo/sample data. Confirm directly with the hospital before traveling.</p>
+      </div>
 
-          <!-- Demo Data Callout Warning -->
-          <div class="demo-data-warning-bar" role="note">
-            <span class="ddw-icon" aria-hidden="true">⚠️</span>
-            <div class="ddw-content">
-              <strong>DEMO DATA — HOSPITAL AVAILABILITY IS NOT REAL-TIME</strong>
-              <p>All bed counts shown are sample/demo figures. Always confirm current bed availability directly with the hospital.</p>
-            </div>
-          </div>
-
-          <!-- Success Notification Pill -->
-          <div class="intake-success-banner" id="intakeSuccessBanner">
-            <span class="isb-icon">✅</span>
-            <div class="isb-body">
-              <strong>Emergency request processed</strong>
-              <p>Here are the hospitals prioritized for your selected emergency details. Priority assigned: <span id="successPriorityText">Emergency assessment</span></p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Recommended Hospital Cards Grid -->
-        <div class="hospital-grid" id="intakeHospitalGrid" aria-live="polite"></div>
-
-        <!-- Empty Results Fallback -->
-        <div class="empty-state" id="intakeEmptyState" hidden>
-          <span class="empty-icon" aria-hidden="true">🏥</span>
-          <h3>No matching emergency facilities found</h3>
-          <p>Please broaden your district or contact emergency services immediately.</p>
-          <a href="tel:112" class="btn btn-emergency">🚨 CALL 112 IMMEDIATELY</a>
+      <!-- Priority Notification Banner (shown upon intake matching) -->
+      <div class="intake-success-banner" id="intakePriorityBanner" hidden>
+        <span class="isb-icon">🎯</span>
+        <div class="isb-body">
+          <strong>Prioritized for your emergency details</strong>
+          <p id="intakePriorityBannerText">Results are prioritized using the information provided. Confirm availability and suitability directly with the hospital.</p>
         </div>
       </div>
 
+      <!-- Demo Data Warning Bar -->
+      <div class="demo-data-warning-bar" role="note">
+        <span class="ddw-icon" aria-hidden="true">⚠️</span>
+        <div class="ddw-content">
+          <strong>DEMO DATA — HOSPITAL AVAILABILITY IS NOT REAL-TIME</strong>
+          <p>Always confirm current bed availability directly with the hospital.</p>
+        </div>
+      </div>
+
+      <div class="hospital-grid" id="hospitalGrid" aria-live="polite"></div>
+
+      <div class="empty-state" id="emptyState" hidden>
+        <span class="empty-icon" aria-hidden="true">🔍</span>
+        <h3>No matching hospitals found</h3>
+        <p>Try selecting another district, city or bed type.</p>
+        <button class="btn btn-outline" id="emptyClearBtn" type="button">CLEAR ALL FILTERS</button>
+      </div>
     </div>
   </section>
 
