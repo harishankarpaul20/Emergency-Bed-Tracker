@@ -13,7 +13,7 @@
 
   // 1. Production Backend URL (Configure this with your deployed backend URL on Render, Railway, etc.)
   // Note: Must be an HTTPS endpoint when the frontend is served via GitHub Pages (HTTPS).
-  const PRODUCTION_BACKEND_URL = 'https://emergency-bed-tracker-backend.onrender.com';
+  const PRODUCTION_BACKEND_URL = 'https://emergency-bed-tracker.onrender.com';
   const PRODUCTION_API_URL = `${PRODUCTION_BACKEND_URL}/api`;
 
   // 2. Local Development Backend URL

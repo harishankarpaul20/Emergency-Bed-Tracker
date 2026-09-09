@@ -30,7 +30,7 @@ git push origin main
 2. Click **New +** $\to$ **Web Service**.
 3. Select your repository: `harishankarpaul20/Emergency-Bed-Tracker`.
 4. Fill in the settings:
-   - **Name**: `emergency-bed-tracker-api` (or your chosen name)
+   - **Name**: `emergency-bed-tracker`
    - **Region**: Singapore (or nearest to India)
    - **Root Directory**: `Backend`
    - **Runtime**: `Node`
@@ -51,12 +51,12 @@ Under the **Environment Variables** section on Render, add:
 ### Step 4: Deploy & Copy Your Render URL
 1. Click **Deploy Web Service**.
 2. Wait 1–2 minutes for the build to complete.
-3. Once deployed, Render will display your live URL (e.g. `https://emergency-bed-tracker-api.onrender.com`).
+3. Once deployed, Render will display your live URL: `https://emergency-bed-tracker.onrender.com`.
 
-### Step 5: Update `config.js` with Your Render URL
-In [`config.js`](./config.js), update `PRODUCTION_BACKEND_URL`:
+### Step 5: Verify `config.js` Matches Your Render URL
+In [`config.js`](./config.js), `PRODUCTION_BACKEND_URL` is configured as:
 ```javascript
-const PRODUCTION_BACKEND_URL = 'https://emergency-bed-tracker-api.onrender.com';
+const PRODUCTION_BACKEND_URL = 'https://emergency-bed-tracker.onrender.com';
 ```
 Commit and push to GitHub:
 ```bash
