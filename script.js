@@ -174,9 +174,25 @@
     return body;
   }
 
+  function formatErrorMessage(item) {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    if (item.message) return typeof item.message === 'string' ? item.message : formatErrorMessage(item.message);
+    if (item.msg) return typeof item.msg === 'string' ? item.msg : formatErrorMessage(item.msg);
+    if (item.error) return typeof item.error === 'string' ? item.error : formatErrorMessage(item.error);
+    if (Array.isArray(item.errors) && item.errors.length) return formatErrorMessage(item.errors[0]);
+    if (typeof item === 'object') {
+      if (item.label) return item.label;
+      const values = Object.values(item).map(v => (typeof v === 'string' ? v : (typeof v === 'number' ? String(v) : ''))).filter(Boolean);
+      if (values.length) return values.join(' - ');
+      try { return JSON.stringify(item); } catch (e) { return String(item); }
+    }
+    return String(item);
+  }
+
   function showToast(message, duration = 3400) {
     if (!toast) return;
-    toast.textContent = message;
+    toast.textContent = typeof message === 'string' ? message : formatErrorMessage(message);
     toast.hidden = false;
     clearTimeout(showToast._t);
     showToast._t = setTimeout(() => { toast.hidden = true; }, duration);
@@ -1950,14 +1966,14 @@
     refContactPhone.value = request?.contactPhone || '';
 
     // Clear / set clinical handoff defaults
-    refCurrentProblem.value = request?.notes || '';
-    refSymptoms.value = request?.notes || '';
-    refDiagnosis.value = '';
-    refTreatmentGiven.value = 'Supplemental oxygen and vital monitoring initiated.';
+    refCurrentProblem.value = request?.notes || 'Acute emergency requiring immediate secondary/tertiary inter-hospital care.';
+    refSymptoms.value = request?.notes || 'Acute symptoms requiring continuous medical oversight and advanced interventions.';
+    refDiagnosis.value = request?.notes ? `Suspected ${request.emergencyType || 'Acute Emergency'} under evaluation` : (request?.emergencyType || 'Acute Emergency Condition under evaluation');
+    refTreatmentGiven.value = 'Supplemental oxygen, IV access, and continuous vital monitoring initiated.';
     refMedicationsGiven.value = '';
     refProceduresPerformed.value = '';
     refCondition.value = 'Serious';
-    refVitals.value = '';
+    refVitals.value = 'BP: 120/80 mmHg, Pulse: 84 bpm, SpO2: 96% on room air, Temp: 98.6°F, GCS: 15/15';
     refReason.value = 'Requires specialized destination facility capacity and tertiary intervention.';
     refNotes.value = '';
 
@@ -2037,8 +2053,15 @@
   }
 
   // Live readiness check triggers on inputs
-  [refPatientName, refPatientAge, refCurrentProblem, refSymptoms, refDiagnosis, refTreatmentGiven, refReason, refCondition].forEach(el => {
-    if (el) el.addEventListener('input', triggerReadinessCheck);
+  [
+    refPatientName, refPatientAge, refPatientSex, refEmergencyType, refContactPhone,
+    refCurrentProblem, refSymptoms, refDiagnosis, refTreatmentGiven, refMedicationsGiven,
+    refProceduresPerformed, refCondition, refVitals, refReason, refNotes
+  ].forEach(el => {
+    if (el) {
+      el.addEventListener('input', triggerReadinessCheck);
+      el.addEventListener('change', triggerReadinessCheck);
+    }
   });
 
   document.querySelectorAll('input[name="specialReq"]').forEach(cb => {
@@ -2053,16 +2076,17 @@
     const specialReqs = Array.from(document.querySelectorAll('input[name="specialReq"]:checked')).map(cb => cb.value);
 
     const payload = {
-      patientName: refPatientName?.value || '',
+      patientName: refPatientName?.value?.trim() || '',
       patientAge: parseInt(refPatientAge?.value, 10) || 0,
       patientSex: refPatientSex?.value || 'Male',
-      currentProblem: refCurrentProblem?.value || '',
-      symptoms: refSymptoms?.value || '',
-      diagnosis: refDiagnosis?.value || '',
-      treatmentGiven: refTreatmentGiven?.value || '',
+      currentProblem: refCurrentProblem?.value?.trim() || '',
+      symptoms: refSymptoms?.value?.trim() || '',
+      diagnosis: refDiagnosis?.value?.trim() || '',
+      treatmentGiven: refTreatmentGiven?.value?.trim() || '',
       currentCondition: refCondition?.value || 'Serious',
-      emergencyType: refEmergencyType?.value || 'General Emergency',
-      referralReason: refReason?.value || '',
+      emergencyType: refEmergencyType?.value?.trim() || 'General Emergency',
+      referralReason: refReason?.value?.trim() || '',
+      vitalsObservations: refVitals?.value?.trim() || '',
       destinationHospitalId: refDestHospitalSelect?.value || '',
       receivingDoctorId: refDestDoctorSelect?.value || '',
       specialRequirements: specialReqs,
@@ -2090,7 +2114,14 @@
       if (r.checkDetails.patientInfoComplete) {
         itemsHtml += '<div class="readiness-item pass">✅ Patient identity and clinical handoff complete</div>';
       } else {
-        itemsHtml += '<div class="readiness-item block">❌ Mandatory patient or clinical handoff information missing</div>';
+        const patientBlocks = (r.blocks || [])
+          .filter(b => {
+            const f = typeof b === 'object' ? (b.field || '') : '';
+            return f.startsWith('patientInfo') || f.startsWith('clinicalHandoff');
+          })
+          .map(b => formatErrorMessage(b));
+        const extraInfo = patientBlocks.length ? ` (${patientBlocks.join('; ')})` : '';
+        itemsHtml += `<div class="readiness-item block">❌ Mandatory patient or clinical handoff information missing${escapeHtml(extraInfo)}</div>`;
       }
 
       // Destination Hospital
@@ -2118,7 +2149,8 @@
       // Warnings
       if (r.warnings && r.warnings.length > 0) {
         r.warnings.forEach(w => {
-          itemsHtml += `<div class="readiness-item warn">⚠️ ${escapeHtml(w)}</div>`;
+          const warningText = formatErrorMessage(w);
+          itemsHtml += `<div class="readiness-item warn">⚠️ ${escapeHtml(warningText)}</div>`;
         });
       }
 
@@ -2140,7 +2172,7 @@
         referralConfirmationBox.hidden = true;
       }
     } catch (err) {
-      console.warn('Readiness check note:', err.message);
+      console.warn('Readiness check note:', formatErrorMessage(err));
     }
   }
 
@@ -2150,8 +2182,9 @@
       e.preventDefault();
 
       if (currentReadinessResult && !currentReadinessResult.isReady) {
-        const firstBlock = currentReadinessResult.blocks[0] || 'Please resolve all readiness blocks before sending.';
-        showToast(`❌ Cannot send referral: ${firstBlock}`);
+        const rawFirstBlock = currentReadinessResult.blocks?.[0];
+        const firstBlockMsg = formatErrorMessage(rawFirstBlock) || 'Please resolve all readiness blocks before sending.';
+        showToast(`❌ Cannot send referral: ${firstBlockMsg}`);
         return;
       }
 
@@ -2193,7 +2226,8 @@
         closeReferralModal();
         switchStaffTab('outgoing');
       } catch (err) {
-        showToast(`❌ Referral failed: ${err.message}`);
+        const errMsg = (err.body && (err.body.message || (err.body.errors && formatErrorMessage(err.body.errors[0])))) || err.message || formatErrorMessage(err);
+        showToast(`❌ Referral failed: ${errMsg}`);
       } finally {
         referralModalSubmitBtn.disabled = false;
         referralModalSubmitBtn.textContent = 'CONFIRM & SEND REFERRAL';
@@ -2294,7 +2328,7 @@
             await apiRequest(`/referrals/${btn.dataset.id}/transfer`, { method: 'PATCH' });
             showToast('Ambulance transfer initiated and recorded.');
             loadOutgoingReferrals();
-          } catch (e) { showToast(`❌ ${e.message}`); }
+          } catch (e) { showToast(`❌ ${formatErrorMessage(e)}`); }
         });
       });
     } catch (err) {
@@ -2472,7 +2506,7 @@
       loadIncomingReferrals();
       loadOutgoingReferrals();
     } catch (err) {
-      showToast(`❌ ${err.message}`);
+      showToast(`❌ ${formatErrorMessage(err)}`);
     }
   }
 

@@ -49,19 +49,30 @@ async function performReadinessCheck({
     { key: 'vitalsObservations', field: 'clinicalHandoff.vitals', label: 'Vitals & Observations' },
   ];
 
+  const patientBlocks = [];
   requiredFields.forEach(f => {
-    const val = patientData[f.key];
+    let val = patientData[f.key];
     if (val === undefined || val === null || String(val).trim() === '') {
-      blocks.push({
+      // Check nested aliases in case data was passed nested
+      if (f.key === 'patientName') val = patientData.patientInfo?.name || patientData.name;
+      else if (f.key === 'patientAge') val = patientData.patientInfo?.age || patientData.age;
+      else if (f.key === 'patientSex') val = patientData.patientInfo?.gender || patientData.patientInfo?.sex || patientData.sex;
+      else if (f.key === 'currentProblem') val = patientData.clinicalHandoff?.presentingProblem || patientData.problem;
+      else if (f.key === 'diagnosis') val = patientData.clinicalHandoff?.workingDiagnosis;
+      else if (f.key === 'referralReason') val = patientData.clinicalHandoff?.referralReason;
+      else if (f.key === 'vitalsObservations') val = patientData.clinicalHandoff?.vitals;
+    }
+
+    if (val === undefined || val === null || String(val).trim() === '') {
+      patientBlocks.push({
         field: f.field,
         message: 'Missing mandatory field: ' + f.label,
       });
     }
   });
 
-  if (blocks.length === 0) {
-    checkDetails.patientInfoComplete = true;
-  }
+  blocks.push(...patientBlocks);
+  checkDetails.patientInfoComplete = (patientBlocks.length === 0);
 
   // 2. Hospital checks
   if (!referringHospitalId) {

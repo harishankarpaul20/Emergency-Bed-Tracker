@@ -1059,19 +1059,19 @@
       <input type="hidden" id="refIntakeId" value="">
 
       <!-- PATIENT IDENTITY SUMMARY (READ-ONLY / PRE-FILLED) -->
-      <div class="admin-panel-card" style="background: #f8fafc; border-color: #cbd5e1; margin-bottom: 16px;">
-        <h4 style="margin: 0 0 8px; font-size: 0.92rem; color: var(--secondary);">1. Patient Identity &amp; Existing Demographics</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
-          <div>
-            <label for="refPatientName" style="font-size: 0.78rem; font-weight: 600;">Patient Name *</label>
+      <div class="admin-panel-card ref-card-section" style="background: #f8fafc; border-color: #cbd5e1; margin-bottom: 16px;">
+        <h4 style="margin: 0 0 10px; font-size: 0.92rem; color: var(--secondary);">1. Patient Identity &amp; Existing Demographics</h4>
+        <div class="ref-identity-grid">
+          <div class="form-group ref-full-width">
+            <label for="refPatientName">Patient Full Name *</label>
             <input type="text" id="refPatientName" required class="form-control" placeholder="Patient Full Name">
           </div>
-          <div>
-            <label for="refPatientAge" style="font-size: 0.78rem; font-weight: 600;">Age *</label>
-            <input type="number" id="refPatientAge" required min="0" max="120" class="form-control" placeholder="Age">
+          <div class="form-group">
+            <label for="refPatientAge">Age (Years) *</label>
+            <input type="number" id="refPatientAge" required min="0" max="120" class="form-control" placeholder="Age in years">
           </div>
-          <div>
-            <label for="refPatientSex" style="font-size: 0.78rem; font-weight: 600;">Sex *</label>
+          <div class="form-group">
+            <label for="refPatientSex">Sex / Gender *</label>
             <select id="refPatientSex" required class="form-control">
               <option value="Male">Male</option>
               <option value="Female">Female</option>
@@ -1079,13 +1079,23 @@
               <option value="Prefer not to say">Prefer not to say</option>
             </select>
           </div>
-          <div>
-            <label for="refEmergencyType" style="font-size: 0.78rem; font-weight: 600;">Emergency Category *</label>
-            <input type="text" id="refEmergencyType" required class="form-control" placeholder="e.g. Cardiac Emergency, Trauma">
+          <div class="form-group">
+            <label for="refEmergencyType">Emergency Category *</label>
+            <input type="text" id="refEmergencyType" required class="form-control" placeholder="e.g. Cardiac Emergency, Polytrauma, Stroke">
           </div>
-          <div>
-            <label for="refContactPhone" style="font-size: 0.78rem; font-weight: 600;">Contact Phone</label>
-            <input type="text" id="refContactPhone" class="form-control" placeholder="Emergency contact">
+          <div class="form-group">
+            <label for="refCondition">Current Clinical Condition *</label>
+            <select id="refCondition" required class="form-control">
+              <option value="Very Serious / Critical">Very Serious / Critical</option>
+              <option value="Serious" selected>Serious</option>
+              <option value="Moderate">Moderate</option>
+              <option value="Stable">Stable</option>
+              <option value="Unknown">Unknown</option>
+            </select>
+          </div>
+          <div class="form-group ref-full-width">
+            <label for="refContactPhone">Emergency Contact Phone</label>
+            <input type="tel" id="refContactPhone" class="form-control" placeholder="e.g. +91 98765 43210">
           </div>
         </div>
       </div>
@@ -1119,25 +1129,13 @@
               <textarea id="refMedicationsGiven" rows="2" class="form-control" placeholder="List drugs, dosages, and administration route/time..."></textarea>
             </div>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
-            <div class="form-group">
-              <label for="refProceduresPerformed" style="font-weight: 600; font-size: 0.82rem;">Procedures Performed</label>
-              <textarea id="refProceduresPerformed" rows="2" class="form-control" placeholder="Intubation, chest tube, central line, wound care, splinting..."></textarea>
-            </div>
-            <div class="form-group">
-              <label for="refCondition" style="font-weight: 600; font-size: 0.82rem;">Current Clinical Condition *</label>
-              <select id="refCondition" required class="form-control">
-                <option value="Very Serious / Critical">Very Serious / Critical</option>
-                <option value="Serious">Serious</option>
-                <option value="Moderate">Moderate</option>
-                <option value="Stable">Stable</option>
-                <option value="Unknown">Unknown</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label for="refProceduresPerformed" style="font-weight: 600; font-size: 0.82rem;">Procedures Performed</label>
+            <textarea id="refProceduresPerformed" rows="2" class="form-control" placeholder="Intubation, chest tube, central line, wound care, splinting..."></textarea>
           </div>
           <div class="form-group">
-            <label for="refVitals" style="font-weight: 600; font-size: 0.82rem;">Important Vitals &amp; Clinical Parameters</label>
-            <textarea id="refVitals" rows="2" class="form-control" placeholder="e.g. BP: 90/60, HR: 115 bpm, SPO2: 91% on room air, GCS: 13/15, Temp: 101°F..."></textarea>
+            <label for="refVitals" style="font-weight: 600; font-size: 0.82rem;">Important Vitals &amp; Clinical Parameters *</label>
+            <textarea id="refVitals" rows="2" required class="form-control" placeholder="e.g. BP: 120/80 mmHg, HR: 88 bpm, SPO2: 95% on room air, GCS: 14/15, Temp: 98.6°F..."></textarea>
           </div>
           <div class="form-group">
             <label for="refReason" style="font-weight: 600; font-size: 0.82rem;">Reason for Referral *</label>
