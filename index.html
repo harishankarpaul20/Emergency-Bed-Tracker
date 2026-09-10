@@ -998,20 +998,277 @@
         </table>
       </div>
 
-      <h3 style="font-size: 1.05rem; margin-top: 24px;">Incoming Bed Requests</h3>
-      <div id="staffRequestsContainer" style="margin-top: 8px;">
-        <p style="color: var(--muted); font-size: 0.88rem;">No requests currently pending.</p>
+      <!-- STAFF PORTAL PATIENT & REFERRAL TABS -->
+      <div style="margin-top: 24px;">
+        <div class="staff-portal-tabs" style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 14px; flex-wrap: wrap;">
+          <button type="button" class="staff-tab-btn active" id="tabBtnRequests" style="padding: 8px 14px; border: none; background: transparent; font-weight: 700; font-size: 0.88rem; cursor: pointer; border-bottom: 3px solid var(--primary); margin-bottom: -2px; color: var(--primary);">📋 Bed Requests</button>
+          <button type="button" class="staff-tab-btn" id="tabBtnIncomingRef" style="padding: 8px 14px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted); margin-bottom: -2px;">📥 My Referrals (Incoming)</button>
+          <button type="button" class="staff-tab-btn" id="tabBtnOutgoingRef" style="padding: 8px 14px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted); margin-bottom: -2px;">📤 Sent Referrals (Outgoing)</button>
+        </div>
+
+        <!-- 1. PANE: BED REQUESTS -->
+        <div id="tabPaneRequests">
+          <div id="staffRequestsContainer" style="margin-top: 8px;">
+            <p style="color: var(--muted); font-size: 0.88rem;">No requests currently pending.</p>
+          </div>
+        </div>
+
+        <!-- 2. PANE: INCOMING REFERRALS -->
+        <div id="tabPaneIncomingRef" hidden>
+          <div class="referral-filter-bar" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+            <button type="button" class="chip active ref-filter-chip" data-status="all">All</button>
+            <button type="button" class="chip ref-filter-chip" data-status="pending">Pending</button>
+            <button type="button" class="chip ref-filter-chip" data-status="accepted">Accepted</button>
+            <button type="button" class="chip ref-filter-chip" data-status="transferred">Transferred</button>
+            <button type="button" class="chip ref-filter-chip" data-status="received">Received</button>
+            <button type="button" class="chip ref-filter-chip" data-status="completed">Completed</button>
+            <button type="button" class="chip ref-filter-chip" data-status="more_information_requested">Info Requested</button>
+            <button type="button" class="chip ref-filter-chip" data-status="rejected">Rejected</button>
+          </div>
+          <div id="incomingReferralsContainer">
+            <p style="color: var(--muted); font-size: 0.88rem;">No incoming patient referrals.</p>
+          </div>
+        </div>
+
+        <!-- 3. PANE: OUTGOING REFERRALS -->
+        <div id="tabPaneOutgoingRef" hidden>
+          <div id="outgoingReferralsContainer" style="margin-top: 8px;">
+            <p style="color: var(--muted); font-size: 0.88rem;">No outgoing referrals recorded.</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
+
+<!-- ================= REFERRAL CREATION MODAL ================= -->
+<div class="modal-overlay" id="referralModalOverlay" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="referralModalTitle" id="referralModal" style="max-height: 90vh; overflow-y: auto;">
+    <button class="modal-close" id="referralModalCloseBtn" aria-label="Close referral form">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="referralModalTitle" style="margin: 0; font-size: 1.25rem;">Emergency Patient Referral &amp; Clinical Handoff</h2>
+        <p class="eyebrow" style="margin: 2px 0 0;">Inter-Hospital Transfer Protocol</p>
+      </div>
+      <span class="status-badge" id="referralHospBadge">🏥 Referring Hospital</span>
+    </div>
+
+    <form id="createReferralForm" class="portal-form" style="margin-top: 14px;">
+      <input type="hidden" id="refBedRequestId" value="">
+      <input type="hidden" id="refIntakeId" value="">
+
+      <!-- PATIENT IDENTITY SUMMARY (READ-ONLY / PRE-FILLED) -->
+      <div class="admin-panel-card" style="background: #f8fafc; border-color: #cbd5e1; margin-bottom: 16px;">
+        <h4 style="margin: 0 0 8px; font-size: 0.92rem; color: var(--secondary);">1. Patient Identity &amp; Existing Demographics</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <div>
+            <label for="refPatientName" style="font-size: 0.78rem; font-weight: 600;">Patient Name *</label>
+            <input type="text" id="refPatientName" required class="form-control" placeholder="Patient Full Name">
+          </div>
+          <div>
+            <label for="refPatientAge" style="font-size: 0.78rem; font-weight: 600;">Age *</label>
+            <input type="number" id="refPatientAge" required min="0" max="120" class="form-control" placeholder="Age">
+          </div>
+          <div>
+            <label for="refPatientSex" style="font-size: 0.78rem; font-weight: 600;">Sex *</label>
+            <select id="refPatientSex" required class="form-control">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+          <div>
+            <label for="refEmergencyType" style="font-size: 0.78rem; font-weight: 600;">Emergency Category *</label>
+            <input type="text" id="refEmergencyType" required class="form-control" placeholder="e.g. Cardiac Emergency, Trauma">
+          </div>
+          <div>
+            <label for="refContactPhone" style="font-size: 0.78rem; font-weight: 600;">Contact Phone</label>
+            <input type="text" id="refContactPhone" class="form-control" placeholder="Emergency contact">
+          </div>
+        </div>
+      </div>
+
+      <!-- CLINICAL HANDOFF INFORMATION -->
+      <div class="admin-panel-card" style="margin-bottom: 16px;">
+        <h4 style="margin: 0 0 4px; font-size: 0.92rem; color: var(--secondary);">2. Clinical Handoff &amp; Medical Observations</h4>
+        <p style="font-size: 0.78rem; color: var(--muted); margin-bottom: 12px; font-style: italic;">
+          Clinician-entered handoff information. This application does not diagnose patients or replace professional clinical judgment.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="form-group">
+            <label for="refCurrentProblem" style="font-weight: 600; font-size: 0.82rem;">Current Problem / Chief Complaint *</label>
+            <textarea id="refCurrentProblem" rows="2" required class="form-control" placeholder="Describe the patient's current acute problem requiring inter-hospital transfer..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="refSymptoms" style="font-weight: 600; font-size: 0.82rem;">Current Symptoms &amp; Important Observations *</label>
+            <textarea id="refSymptoms" rows="2" required class="form-control" placeholder="Current symptoms, presentation, and timeline..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="refDiagnosis" style="font-weight: 600; font-size: 0.82rem;">Diagnosis / Working Diagnosis *</label>
+            <textarea id="refDiagnosis" rows="2" required class="form-control" placeholder="Enter clinical diagnosis or working differential diagnosis..."></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+            <div class="form-group">
+              <label for="refTreatmentGiven" style="font-weight: 600; font-size: 0.82rem;">Treatment Already Provided *</label>
+              <textarea id="refTreatmentGiven" rows="2" required class="form-control" placeholder="Emergency treatments, stabilization, fluid resuscitation..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="refMedicationsGiven" style="font-weight: 600; font-size: 0.82rem;">Medications Administered</label>
+              <textarea id="refMedicationsGiven" rows="2" class="form-control" placeholder="List drugs, dosages, and administration route/time..."></textarea>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+            <div class="form-group">
+              <label for="refProceduresPerformed" style="font-weight: 600; font-size: 0.82rem;">Procedures Performed</label>
+              <textarea id="refProceduresPerformed" rows="2" class="form-control" placeholder="Intubation, chest tube, central line, wound care, splinting..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="refCondition" style="font-weight: 600; font-size: 0.82rem;">Current Clinical Condition *</label>
+              <select id="refCondition" required class="form-control">
+                <option value="Very Serious / Critical">Very Serious / Critical</option>
+                <option value="Serious">Serious</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Stable">Stable</option>
+                <option value="Unknown">Unknown</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="refVitals" style="font-weight: 600; font-size: 0.82rem;">Important Vitals &amp; Clinical Parameters</label>
+            <textarea id="refVitals" rows="2" class="form-control" placeholder="e.g. BP: 90/60, HR: 115 bpm, SPO2: 91% on room air, GCS: 13/15, Temp: 101°F..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="refReason" style="font-weight: 600; font-size: 0.82rem;">Reason for Referral *</label>
+            <textarea id="refReason" rows="2" required class="form-control" placeholder="Specific clinical rationale (e.g. requires tertiary cath lab, pediatric ICU bed full, neurosurgical decompression)..."></textarea>
+          </div>
+          <div class="form-group">
+            <label style="font-weight: 600; font-size: 0.82rem; margin-bottom: 6px; display: block;">Special Requirements (Multi-select)</label>
+            <div id="refSpecialReqGrid" class="spec-req-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="ICU"> ICU</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Oxygen"> Oxygen</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Ventilator"> Ventilator</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Surgery"> Surgery</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Cardiology"> Cardiology</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Neurology"> Neurology</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Trauma Care"> Trauma Care</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Pediatric Care"> Pediatric Care</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Obstetric Care"> Obstetric Care</label>
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Other"> Other</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="refNotes" style="font-weight: 600; font-size: 0.82rem;">Additional Notes</label>
+            <textarea id="refNotes" rows="2" class="form-control" placeholder="Ambulance crew contact, escorting doctor, DNR status..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESTINATION HOSPITAL & RECEIVING DOCTOR -->
+      <div class="admin-panel-card" style="margin-bottom: 16px;">
+        <h4 style="margin: 0 0 10px; font-size: 0.92rem; color: var(--secondary);">3. Destination Facility &amp; Receiving Doctor</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+          <div class="form-group">
+            <label for="refDestHospitalSelect" style="font-weight: 600; font-size: 0.82rem;">Destination Hospital *</label>
+            <select id="refDestHospitalSelect" required class="form-control">
+              <option value="">Select Destination Hospital ▼</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="refDestDoctorSelect" style="font-weight: 600; font-size: 0.82rem;">Receiving Doctor / Staff *</label>
+            <select id="refDestDoctorSelect" required class="form-control">
+              <option value="">Select Receiving Doctor ▼</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUTOMATIC REFERRAL READINESS CHECK CARD -->
+      <div id="referralReadinessBox" class="readiness-card" style="margin-bottom: 16px; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="margin: 0; font-size: 0.92rem; color: var(--secondary);">⚡ Automatic Referral Readiness Check</h4>
+          <span id="readinessStatusBadge" class="status-badge" style="font-size: 0.75rem;">Awaiting verification</span>
+        </div>
+        <div id="readinessCheckItems" style="font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px;">
+          <div>ℹ️ Please fill clinical handoff and select destination hospital and receiving doctor to evaluate readiness.</div>
+        </div>
+      </div>
+
+      <!-- FINAL CONFIRMATION SUMMARY CARD -->
+      <div id="referralConfirmationBox" style="margin-bottom: 16px; padding: 12px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 8px; font-size: 0.85rem;" hidden>
+        <h5 style="margin: 0 0 6px; font-size: 0.9rem; color: #0369a1;">📋 Referral Transfer Summary</h5>
+        <div id="confirmationSummaryText"></div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-ghost" id="referralModalCancelBtn">CANCEL</button>
+        <button type="submit" class="btn btn-primary" id="referralModalSubmitBtn">CONFIRM &amp; SEND REFERRAL</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= REFERRAL DETAILS & ACTIONS MODAL ================= -->
+<div class="modal-overlay" id="referralDetailModalOverlay" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="refDetailTitle" id="referralDetailModal" style="max-height: 90vh; overflow-y: auto;">
+    <button class="modal-close" id="refDetailCloseBtn" aria-label="Close referral details">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="refDetailTitle" style="margin: 0; font-size: 1.25rem;">Patient Referral Details</h2>
+        <p class="eyebrow" id="refDetailSubtitle" style="margin: 2px 0 0;">Protocol Reference</p>
+      </div>
+      <span class="status-badge" id="refDetailStatusBadge">PENDING</span>
+    </div>
+
+    <div id="refDetailBody" style="margin-top: 14px; font-size: 0.88rem;">
+      <!-- Injected by script.js -->
+    </div>
+
+    <!-- CONTEXTUAL ACTION BUTTONS -->
+    <div class="modal-footer" id="refDetailActions" style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+      <!-- Buttons injected based on status & role -->
+    </div>
+  </div>
+</div>
+
+<!-- ================= REJECTION REASON PROMPT MODAL ================= -->
+<div class="modal-overlay" id="referralRejectModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="max-width: 480px;">
+    <h3>Reject Patient Referral</h3>
+    <p style="font-size: 0.82rem; color: var(--muted);">A mandatory clinical or administrative reason is required for rejection.</p>
+    <div class="form-group" style="margin-top: 12px;">
+      <label for="rejectReasonInput" style="font-weight: 600; font-size: 0.82rem;">Reason for Rejection *</label>
+      <textarea id="rejectReasonInput" required rows="3" class="form-control" placeholder="Specify clinical reason (e.g. no ICU capacity, patient requires specialized surgical intervention not available here)..."></textarea>
+    </div>
+    <div class="modal-footer" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button type="button" class="btn btn-ghost" id="rejectCancelBtn">CANCEL</button>
+      <button type="button" class="btn btn-danger" id="rejectConfirmBtn">CONFIRM REJECTION</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= REQUEST MORE INFO PROMPT MODAL ================= -->
+<div class="modal-overlay" id="referralMoreInfoModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="max-width: 480px;">
+    <h3>Request Additional Information</h3>
+    <p style="font-size: 0.82rem; color: var(--muted);">Specify what diagnostic or clinical details are required before accepting this transfer.</p>
+    <div class="form-group" style="margin-top: 12px;">
+      <label for="moreInfoInput" style="font-weight: 600; font-size: 0.82rem;">Information Required *</label>
+      <textarea id="moreInfoInput" required rows="3" class="form-control" placeholder="e.g. Please provide recent arterial blood gas, ECG strip, and CT head report..."></textarea>
+    </div>
+    <div class="modal-footer" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button type="button" class="btn btn-ghost" id="moreInfoCancelBtn">CANCEL</button>
+      <button type="button" class="btn btn-primary" id="moreInfoConfirmBtn">SEND REQUEST</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- Socket.IO & Leaflet Scripts -->
 <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=2.4"></script>
-<script src="script.js?v=2.4"></script>
+<script src="config.js?v=2.5"></script>
+<script src="script.js?v=2.5"></script>
 </body>
 </html>

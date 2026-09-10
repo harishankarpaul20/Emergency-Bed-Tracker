@@ -20,6 +20,7 @@ const bedRoutes = require('./routes/bedRoutes');
 const bedRequestRoutes = require('./routes/bedRequestRoutes');
 const emergencyRoutes = require('./routes/emergencyRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const referralRoutes = require('./routes/referralRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -170,6 +171,7 @@ app.use('/api/beds', bedRoutes);
 app.use('/api/bed-requests', bedRequestRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/referrals', referralRoutes);
 
 // 404 & Global Error Handling
 app.use(notFound);

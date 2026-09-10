@@ -1481,3 +1481,105 @@ button { font-family: inherit; }
 
 
 
+
+/* =========================================================
+   HOSPITAL REFERRAL & CLINICAL HANDOFF STYLES
+   ========================================================= */
+.staff-tab-btn {
+  transition: all 0.2s ease;
+}
+.staff-tab-btn.active {
+  color: var(--primary) !important;
+  border-bottom: 3px solid var(--primary) !important;
+  font-weight: 700 !important;
+}
+.staff-tab-btn:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.referral-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.referral-card:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.ref-info h4 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ref-info p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.ref-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.readiness-card {
+  transition: all 0.2s ease;
+}
+.readiness-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.readiness-item.pass { color: #166534; }
+.readiness-item.warn { color: #b45309; }
+.readiness-item.block { color: #991b1b; }
+
+.spec-req-grid label {
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.audit-timeline {
+  border-left: 2px solid var(--border);
+  padding-left: 14px;
+  margin-left: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.timeline-item {
+  position: relative;
+}
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -19px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.timeline-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.timeline-text {
+  font-size: 0.84rem;
+  margin-top: 2px;
+}

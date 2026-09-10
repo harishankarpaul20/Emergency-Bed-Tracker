@@ -36,6 +36,10 @@ const {
 // Public stats & district aggregates (place before :id to prevent parameter conflict)
 router.get('/statistics', getStatistics);
 router.get('/districts', getDistricts);
+router.get('/search', (req, res, next) => {
+  req.query.search = req.query.q || req.query.search || '';
+  return getHospitals(req, res, next);
+});
 
 // Hospitals collection
 router.get('/', hospitalQueryRules, validate, getHospitals);

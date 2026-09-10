@@ -931,6 +931,7 @@
       const url = (currentUser.role === 'super_admin' && hospId) ? `/bed-requests?hospital=${hospId}` : '/bed-requests';
       const res = await apiRequest(url);
       const reqs = res.data || [];
+      window._staffRequestsCache = reqs;
       if (!reqs.length) {
         staffRequestsContainer.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">No bed requests found for this facility.</p>';
         return;
@@ -948,6 +949,7 @@
               <button type="button" class="btn btn-primary btn-xs req-approve-btn" data-id="${r._id}">Approve</button>
               <button type="button" class="btn btn-outline btn-xs req-reject-btn" data-id="${r._id}">Reject</button>
             ` : `<span>Completed</span>`}
+            <button type="button" class="btn btn-outline btn-xs req-refer-btn" data-id="${r._id}" style="color: #0284c7; border-color: #0284c7;">REFER PATIENT</button>
           </div>
         </div>
       `).join('');
@@ -1804,5 +1806,741 @@
   }
 
   document.addEventListener('DOMContentLoaded', init);
+
+  /* =====================================================
+     14. HOSPITAL-TO-HOSPITAL EMERGENCY REFERRAL SYSTEM
+     ===================================================== */
+  let activeReferralsList = [];
+  let currentDetailReferralId = null;
+  let cachedStaffRequests = [];
+
+  // Tab navigation elements
+  const tabBtnRequests = document.getElementById('tabBtnRequests');
+  const tabBtnIncomingRef = document.getElementById('tabBtnIncomingRef');
+  const tabBtnOutgoingRef = document.getElementById('tabBtnOutgoingRef');
+  const tabPaneRequests = document.getElementById('tabPaneRequests');
+  const tabPaneIncomingRef = document.getElementById('tabPaneIncomingRef');
+  const tabPaneOutgoingRef = document.getElementById('tabPaneOutgoingRef');
+  const incomingReferralsContainer = document.getElementById('incomingReferralsContainer');
+  const outgoingReferralsContainer = document.getElementById('outgoingReferralsContainer');
+
+  // Referral creation modal elements
+  const referralModalOverlay = document.getElementById('referralModalOverlay');
+  const referralModalCloseBtn = document.getElementById('referralModalCloseBtn');
+  const referralModalCancelBtn = document.getElementById('referralModalCancelBtn');
+  const createReferralForm = document.getElementById('createReferralForm');
+  const referralHospBadge = document.getElementById('referralHospBadge');
+
+  const refBedRequestId = document.getElementById('refBedRequestId');
+  const refIntakeId = document.getElementById('refIntakeId');
+  const refPatientName = document.getElementById('refPatientName');
+  const refPatientAge = document.getElementById('refPatientAge');
+  const refPatientSex = document.getElementById('refPatientSex');
+  const refEmergencyType = document.getElementById('refEmergencyType');
+  const refContactPhone = document.getElementById('refContactPhone');
+
+  const refCurrentProblem = document.getElementById('refCurrentProblem');
+  const refSymptoms = document.getElementById('refSymptoms');
+  const refDiagnosis = document.getElementById('refDiagnosis');
+  const refTreatmentGiven = document.getElementById('refTreatmentGiven');
+  const refMedicationsGiven = document.getElementById('refMedicationsGiven');
+  const refProceduresPerformed = document.getElementById('refProceduresPerformed');
+  const refCondition = document.getElementById('refCondition');
+  const refVitals = document.getElementById('refVitals');
+  const refReason = document.getElementById('refReason');
+  const refNotes = document.getElementById('refNotes');
+
+  const refDestHospitalSelect = document.getElementById('refDestHospitalSelect');
+  const refDestDoctorSelect = document.getElementById('refDestDoctorSelect');
+  const referralReadinessBox = document.getElementById('referralReadinessBox');
+  const readinessStatusBadge = document.getElementById('readinessStatusBadge');
+  const readinessCheckItems = document.getElementById('readinessCheckItems');
+  const referralConfirmationBox = document.getElementById('referralConfirmationBox');
+  const confirmationSummaryText = document.getElementById('confirmationSummaryText');
+  const referralModalSubmitBtn = document.getElementById('referralModalSubmitBtn');
+
+  // Referral detail & prompt modal elements
+  const referralDetailModalOverlay = document.getElementById('referralDetailModalOverlay');
+  const refDetailCloseBtn = document.getElementById('refDetailCloseBtn');
+  const refDetailBody = document.getElementById('refDetailBody');
+  const refDetailActions = document.getElementById('refDetailActions');
+  const refDetailStatusBadge = document.getElementById('refDetailStatusBadge');
+
+  const referralRejectModalOverlay = document.getElementById('referralRejectModalOverlay');
+  const rejectReasonInput = document.getElementById('rejectReasonInput');
+  const rejectCancelBtn = document.getElementById('rejectCancelBtn');
+  const rejectConfirmBtn = document.getElementById('rejectConfirmBtn');
+
+  const referralMoreInfoModalOverlay = document.getElementById('referralMoreInfoModalOverlay');
+  const moreInfoInput = document.getElementById('moreInfoInput');
+  const moreInfoCancelBtn = document.getElementById('moreInfoCancelBtn');
+  const moreInfoConfirmBtn = document.getElementById('moreInfoConfirmBtn');
+
+  // 1. Tab switching
+  function switchStaffTab(tabName) {
+    if (!tabPaneRequests || !tabPaneIncomingRef || !tabPaneOutgoingRef) return;
+    
+    [tabBtnRequests, tabBtnIncomingRef, tabBtnOutgoingRef].forEach(b => {
+      if (b) {
+        b.classList.remove('active');
+        b.style.color = 'var(--muted)';
+        b.style.borderBottom = 'none';
+        b.style.fontWeight = '600';
+      }
+    });
+
+    tabPaneRequests.hidden = true;
+    tabPaneIncomingRef.hidden = true;
+    tabPaneOutgoingRef.hidden = true;
+
+    if (tabName === 'requests') {
+      tabBtnRequests.classList.add('active');
+      tabBtnRequests.style.color = 'var(--primary)';
+      tabBtnRequests.style.borderBottom = '3px solid var(--primary)';
+      tabBtnRequests.style.fontWeight = '700';
+      tabPaneRequests.hidden = false;
+    } else if (tabName === 'incoming') {
+      tabBtnIncomingRef.classList.add('active');
+      tabBtnIncomingRef.style.color = 'var(--primary)';
+      tabBtnIncomingRef.style.borderBottom = '3px solid var(--primary)';
+      tabBtnIncomingRef.style.fontWeight = '700';
+      tabPaneIncomingRef.hidden = false;
+      loadIncomingReferrals();
+    } else if (tabName === 'outgoing') {
+      tabBtnOutgoingRef.classList.add('active');
+      tabBtnOutgoingRef.style.color = 'var(--primary)';
+      tabBtnOutgoingRef.style.borderBottom = '3px solid var(--primary)';
+      tabBtnOutgoingRef.style.fontWeight = '700';
+      tabPaneOutgoingRef.hidden = false;
+      loadOutgoingReferrals();
+    }
+  }
+
+  if (tabBtnRequests) tabBtnRequests.addEventListener('click', () => switchStaffTab('requests'));
+  if (tabBtnIncomingRef) tabBtnIncomingRef.addEventListener('click', () => switchStaffTab('incoming'));
+  if (tabBtnOutgoingRef) tabBtnOutgoingRef.addEventListener('click', () => switchStaffTab('outgoing'));
+
+  // Filter chips for incoming referrals
+  document.querySelectorAll('.ref-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.ref-filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      loadIncomingReferrals(chip.dataset.status);
+    });
+  });
+
+  // 2. Open Referral Creation Modal
+  function openReferralModal(request) {
+    if (!referralModalOverlay) return;
+    referralModalOverlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    // Populate user hospital badge
+    const userHosp = currentUser?.hospital;
+    const hospName = userHosp?.name || 'Authorized Referring Hospital';
+    if (referralHospBadge) referralHospBadge.textContent = `🏥 ${hospName}`;
+
+    // Pre-populate patient identity
+    refBedRequestId.value = request?._id || '';
+    refIntakeId.value = request?.emergencyIntake || '';
+    refPatientName.value = request?.patientName || '';
+    refPatientAge.value = request?.patientAge || 45;
+    refPatientSex.value = request?.patientSex || 'Male';
+    refEmergencyType.value = request?.emergencyType || (request?.bedType ? `${request.bedType.toUpperCase()} Emergency` : 'General Emergency');
+    refContactPhone.value = request?.contactPhone || '';
+
+    // Clear / set clinical handoff defaults
+    refCurrentProblem.value = request?.notes || '';
+    refSymptoms.value = request?.notes || '';
+    refDiagnosis.value = '';
+    refTreatmentGiven.value = 'Supplemental oxygen and vital monitoring initiated.';
+    refMedicationsGiven.value = '';
+    refProceduresPerformed.value = '';
+    refCondition.value = 'Serious';
+    refVitals.value = '';
+    refReason.value = 'Requires specialized destination facility capacity and tertiary intervention.';
+    refNotes.value = '';
+
+    // Clear special requirement checkboxes
+    document.querySelectorAll('input[name="specialReq"]').forEach(cb => {
+      cb.checked = (request?.bedType && cb.value.toLowerCase() === request.bedType.toLowerCase());
+    });
+
+    // Populate Destination Hospitals
+    populateDestinationHospitals();
+
+    // Reset confirmation box
+    if (referralConfirmationBox) referralConfirmationBox.hidden = true;
+
+    // Trigger initial readiness evaluation
+    triggerReadinessCheck();
+  }
+
+  function closeReferralModal() {
+    if (referralModalOverlay) referralModalOverlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  if (referralModalCloseBtn) referralModalCloseBtn.addEventListener('click', closeReferralModal);
+  if (referralModalCancelBtn) referralModalCancelBtn.addEventListener('click', closeReferralModal);
+
+  // Populate Destination Hospitals excluding user's hospital
+  function populateDestinationHospitals() {
+    if (!refDestHospitalSelect) return;
+    const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
+
+    const eligibleHospitals = hospitals.filter(h => {
+      const hId = h._id || h.id;
+      return hId && String(hId) !== String(userHospId);
+    });
+
+    refDestHospitalSelect.innerHTML = '<option value="">Select Destination Hospital ▼</option>' +
+      eligibleHospitals.map(h => `<option value="${h._id || h.id}">${escapeHtml(h.name)} (${escapeHtml(h.district)})` +
+      `</option>`).join('');
+
+    refDestDoctorSelect.innerHTML = '<option value="">Select Receiving Doctor ▼</option>';
+  }
+
+  // Destination hospital selection changed -> load doctors
+  if (refDestHospitalSelect) {
+    refDestHospitalSelect.addEventListener('change', async () => {
+      const hospId = refDestHospitalSelect.value;
+      refDestDoctorSelect.innerHTML = '<option value="">Loading receiving doctors...</option>';
+
+      if (!hospId) {
+        refDestDoctorSelect.innerHTML = '<option value="">Select Destination Hospital first</option>';
+        triggerReadinessCheck();
+        return;
+      }
+
+      try {
+        const res = await apiRequest(`/referrals/doctors?hospitalId=${hospId}`);
+        const doctors = res.data || [];
+
+        if (!doctors.length) {
+          refDestDoctorSelect.innerHTML = '<option value="">No doctors registered for this hospital</option>';
+        } else {
+          refDestDoctorSelect.innerHTML = '<option value="">Select Receiving Doctor ▼</option>' +
+            doctors.map(d => `<option value="${d._id || d.id}">${escapeHtml(d.name)} (${escapeHtml(d.specialization || d.department || 'Emergency Care')})` +
+            `</option>`).join('');
+        }
+      } catch (err) {
+        refDestDoctorSelect.innerHTML = '<option value="">Error loading doctors</option>';
+      }
+
+      triggerReadinessCheck();
+    });
+  }
+
+  if (refDestDoctorSelect) {
+    refDestDoctorSelect.addEventListener('change', triggerReadinessCheck);
+  }
+
+  // Live readiness check triggers on inputs
+  [refPatientName, refPatientAge, refCurrentProblem, refSymptoms, refDiagnosis, refTreatmentGiven, refReason, refCondition].forEach(el => {
+    if (el) el.addEventListener('input', triggerReadinessCheck);
+  });
+
+  document.querySelectorAll('input[name="specialReq"]').forEach(cb => {
+    cb.addEventListener('change', triggerReadinessCheck);
+  });
+
+  let currentReadinessResult = null;
+
+  async function triggerReadinessCheck() {
+    if (!readinessCheckItems) return;
+
+    const specialReqs = Array.from(document.querySelectorAll('input[name="specialReq"]:checked')).map(cb => cb.value);
+
+    const payload = {
+      patientName: refPatientName?.value || '',
+      patientAge: parseInt(refPatientAge?.value, 10) || 0,
+      patientSex: refPatientSex?.value || 'Male',
+      currentProblem: refCurrentProblem?.value || '',
+      symptoms: refSymptoms?.value || '',
+      diagnosis: refDiagnosis?.value || '',
+      treatmentGiven: refTreatmentGiven?.value || '',
+      currentCondition: refCondition?.value || 'Serious',
+      emergencyType: refEmergencyType?.value || 'General Emergency',
+      referralReason: refReason?.value || '',
+      destinationHospitalId: refDestHospitalSelect?.value || '',
+      receivingDoctorId: refDestDoctorSelect?.value || '',
+      specialRequirements: specialReqs,
+    };
+
+    try {
+      const res = await apiRequest('/referrals/readiness-check', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      const r = res.data;
+      currentReadinessResult = r;
+
+      if (r.isReady) {
+        readinessStatusBadge.textContent = '✅ READY TO SEND';
+        readinessStatusBadge.className = 'status-badge available';
+      } else {
+        readinessStatusBadge.textContent = '⚠️ BLOCKS DETECTED';
+        readinessStatusBadge.className = 'status-badge full';
+      }
+
+      let itemsHtml = '';
+      // Patient completeness
+      if (r.checkDetails.patientInfoComplete) {
+        itemsHtml += '<div class="readiness-item pass">✅ Patient identity and clinical handoff complete</div>';
+      } else {
+        itemsHtml += '<div class="readiness-item block">❌ Mandatory patient or clinical handoff information missing</div>';
+      }
+
+      // Destination Hospital
+      if (r.checkDetails.destinationHospitalVerified) {
+        itemsHtml += `<div class="readiness-item pass">✅ Destination verified: ${escapeHtml(r.checkDetails.destinationHospitalName || '')}` +
+          `${r.checkDetails.approxDistanceKm ? ` (~ ${r.checkDetails.approxDistanceKm} km away)` : ''}</div>`;
+      } else {
+        itemsHtml += '<div class="readiness-item block">❌ Valid destination hospital must be selected</div>';
+      }
+
+      // Receiving Doctor
+      if (r.checkDetails.receivingDoctorVerified) {
+        itemsHtml += `<div class="readiness-item pass">✅ Receiving doctor verified: ${escapeHtml(r.checkDetails.receivingDoctorName || '')}</div>`;
+      } else {
+        itemsHtml += '<div class="readiness-item block">❌ Authorized receiving doctor must be selected</div>';
+      }
+
+      // Resource capacity
+      if (r.checkDetails.resourceCapacityStatus === 'suitable') {
+        itemsHtml += '<div class="readiness-item pass">✅ Destination facility has capacity for requested bed types</div>';
+      } else {
+        itemsHtml += '<div class="readiness-item warn">⚠️ Destination shows limited/zero capacity for requested special requirements</div>';
+      }
+
+      // Warnings
+      if (r.warnings && r.warnings.length > 0) {
+        r.warnings.forEach(w => {
+          itemsHtml += `<div class="readiness-item warn">⚠️ ${escapeHtml(w)}</div>`;
+        });
+      }
+
+      readinessCheckItems.innerHTML = itemsHtml;
+
+      // Update Confirmation Summary Box
+      if (referralConfirmationBox && r.isReady) {
+        referralConfirmationBox.hidden = false;
+        confirmationSummaryText.innerHTML = `
+          <strong>Patient:</strong> ${escapeHtml(payload.patientName)} (${payload.patientAge}y, ${payload.patientSex})<br>
+          <strong>Destination:</strong> ${escapeHtml(r.checkDetails.destinationHospitalName || 'Selected Hospital')} ` +
+          `(${r.checkDetails.approxDistanceKm ? `${r.checkDetails.approxDistanceKm} km` : 'Distance pending'})<br>
+          <strong>Receiving Doctor:</strong> ${escapeHtml(r.checkDetails.receivingDoctorName || 'Assigned Clinician')}<br>
+          <strong>Condition:</strong> ${escapeHtml(payload.currentCondition)} · <strong>Category:</strong> ${escapeHtml(payload.emergencyType)}<br>
+          <strong>Reason:</strong> ${escapeHtml(payload.referralReason)}<br>
+          <strong>Requirements:</strong> ${specialReqs.length ? specialReqs.join(', ') : 'None specified'}
+        `;
+      } else if (referralConfirmationBox) {
+        referralConfirmationBox.hidden = true;
+      }
+    } catch (err) {
+      console.warn('Readiness check note:', err.message);
+    }
+  }
+
+  // Form Submission
+  if (createReferralForm) {
+    createReferralForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (currentReadinessResult && !currentReadinessResult.isReady) {
+        const firstBlock = currentReadinessResult.blocks[0] || 'Please resolve all readiness blocks before sending.';
+        showToast(`❌ Cannot send referral: ${firstBlock}`);
+        return;
+      }
+
+      referralModalSubmitBtn.disabled = true;
+      referralModalSubmitBtn.textContent = '⏳ Dispatching Referral...';
+
+      const specialReqs = Array.from(document.querySelectorAll('input[name="specialReq"]:checked')).map(cb => cb.value);
+
+      const payload = {
+        bedRequestId: refBedRequestId.value || undefined,
+        emergencyIntakeId: refIntakeId.value || undefined,
+        destinationHospitalId: refDestHospitalSelect.value,
+        receivingDoctorId: refDestDoctorSelect.value,
+        patientName: refPatientName.value.trim(),
+        patientAge: parseInt(refPatientAge.value, 10),
+        patientSex: refPatientSex.value,
+        emergencyType: refEmergencyType.value.trim(),
+        contactPhone: refContactPhone.value.trim(),
+        currentProblem: refCurrentProblem.value.trim(),
+        symptoms: refSymptoms.value.trim(),
+        diagnosis: refDiagnosis.value.trim(),
+        treatmentGiven: refTreatmentGiven.value.trim(),
+        medicationsGiven: refMedicationsGiven.value.trim(),
+        proceduresPerformed: refProceduresPerformed.value.trim(),
+        currentCondition: refCondition.value,
+        vitalsObservations: refVitals.value.trim(),
+        referralReason: refReason.value.trim(),
+        specialRequirements: specialReqs,
+        additionalNotes: refNotes.value.trim(),
+      };
+
+      try {
+        const res = await apiRequest('/referrals', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+
+        showToast('🚀 Emergency referral created and dispatched successfully!');
+        closeReferralModal();
+        switchStaffTab('outgoing');
+      } catch (err) {
+        showToast(`❌ Referral failed: ${err.message}`);
+      } finally {
+        referralModalSubmitBtn.disabled = false;
+        referralModalSubmitBtn.textContent = 'CONFIRM & SEND REFERRAL';
+      }
+    });
+  }
+
+  // 3. Load Incoming Referrals
+  async function loadIncomingReferrals(statusFilter = 'all') {
+    if (!incomingReferralsContainer) return;
+    try {
+      const url = statusFilter && statusFilter !== 'all'
+        ? `/referrals?type=incoming&status=${statusFilter}`
+        : '/referrals?type=incoming';
+
+      const res = await apiRequest(url);
+      const refs = res.data || [];
+
+      if (!refs.length) {
+        incomingReferralsContainer.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem; padding: 12px 0;">No incoming patient referrals matching criteria.</p>';
+        return;
+      }
+
+      incomingReferralsContainer.innerHTML = refs.map(r => `
+        <div class="referral-card">
+          <div class="ref-info">
+            <h4>
+              ${escapeHtml(r.patientName)} (${r.patientAge}y, ${r.patientSex})
+              <span class="status-badge ${r.status}">${escapeHtml(r.status.toUpperCase().replace(/_/g, ' '))}</span>
+            </h4>
+            <p>
+              From: <strong>${escapeHtml(r.referringHospital?.name || 'Referring Facility')}</strong> ·
+              Doctor: <strong>${escapeHtml(r.receivingDoctor?.name || 'Assigned Doctor')}</strong> ·
+              Condition: <span style="font-weight: 600;">${escapeHtml(r.currentCondition)}</span>
+            </p>
+            <p style="margin-top: 3px; font-size: 0.78rem; color: var(--muted);">
+              Reason: "${escapeHtml(r.referralReason)}" · Sent: ${new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+          <div class="ref-actions">
+            <button type="button" class="btn btn-primary btn-xs view-ref-btn" data-id="${r._id}">VIEW DETAILS</button>
+          </div>
+        </div>
+      `).join('');
+
+      incomingReferralsContainer.querySelectorAll('.view-ref-btn').forEach(btn => {
+        btn.addEventListener('click', () => openReferralDetailModal(btn.dataset.id));
+      });
+    } catch (err) {
+      incomingReferralsContainer.innerHTML = `<p style="color: var(--muted);">Error loading referrals: ${err.message}</p>`;
+    }
+  }
+
+  // 4. Load Outgoing Referrals
+  async function loadOutgoingReferrals() {
+    if (!outgoingReferralsContainer) return;
+    try {
+      const res = await apiRequest('/referrals?type=outgoing');
+      const refs = res.data || [];
+
+      if (!refs.length) {
+        outgoingReferralsContainer.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem; padding: 12px 0;">No outgoing referrals dispatched from this facility.</p>';
+        return;
+      }
+
+      outgoingReferralsContainer.innerHTML = refs.map(r => `
+        <div class="referral-card">
+          <div class="ref-info">
+            <h4>
+              ${escapeHtml(r.patientName)} (${r.patientAge}y, ${r.patientSex})
+              <span class="status-badge ${r.status}">${escapeHtml(r.status.toUpperCase().replace(/_/g, ' '))}</span>
+            </h4>
+            <p>
+              To: <strong>${escapeHtml(r.receivingHospital?.name || 'Destination Facility')}</strong> ·
+              Assigned: <strong>${escapeHtml(r.receivingDoctor?.name || 'Receiving Doctor')}</strong> ·
+              Condition: <span style="font-weight: 600;">${escapeHtml(r.currentCondition)}</span>
+            </p>
+            <p style="margin-top: 3px; font-size: 0.78rem; color: var(--muted);">
+              Sent: ${new Date(r.createdAt).toLocaleDateString()} ${new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+          <div class="ref-actions">
+            <button type="button" class="btn btn-outline btn-xs view-ref-btn" data-id="${r._id}">VIEW DETAILS</button>
+            ${r.status === 'accepted' ? `
+              <button type="button" class="btn btn-primary btn-xs ref-transfer-btn" data-id="${r._id}">MARK TRANSFERRED</button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      outgoingReferralsContainer.querySelectorAll('.view-ref-btn').forEach(btn => {
+        btn.addEventListener('click', () => openReferralDetailModal(btn.dataset.id));
+      });
+
+      outgoingReferralsContainer.querySelectorAll('.ref-transfer-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await apiRequest(`/referrals/${btn.dataset.id}/transfer`, { method: 'PATCH' });
+            showToast('Ambulance transfer initiated and recorded.');
+            loadOutgoingReferrals();
+          } catch (e) { showToast(`❌ ${e.message}`); }
+        });
+      });
+    } catch (err) {
+      outgoingReferralsContainer.innerHTML = `<p style="color: var(--muted);">Error loading outgoing referrals: ${err.message}</p>`;
+    }
+  }
+
+  // 5. Open Referral Details Modal
+  async function openReferralDetailModal(referralId) {
+    if (!referralDetailModalOverlay) return;
+    currentDetailReferralId = referralId;
+    referralDetailModalOverlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    refDetailBody.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Loading referral details...</p>';
+    refDetailActions.innerHTML = '';
+
+    try {
+      const res = await apiRequest(`/referrals/${referralId}`);
+      const ref = res.data;
+
+      refDetailStatusBadge.textContent = ref.status.toUpperCase().replace(/_/g, ' ');
+      refDetailStatusBadge.className = `status-badge ${ref.status}`;
+
+      const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
+      const isReceiving = String(userHospId) === String(ref.receivingHospital?._id || ref.receivingHospital);
+      const isReferring = String(userHospId) === String(ref.referringHospital?._id || ref.referringHospital);
+
+      // Build Details HTML
+      let html = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 16px;">
+          <div class="admin-panel-card" style="margin: 0;">
+            <h4 style="margin: 0 0 6px; font-size: 0.9rem;">Patient Information</h4>
+            <p style="margin: 2px 0;"><strong>Name:</strong> ${escapeHtml(ref.patientName)}</p>
+            <p style="margin: 2px 0;"><strong>Age / Sex:</strong> ${ref.patientAge} years · ${escapeHtml(ref.patientSex)}</p>
+            <p style="margin: 2px 0;"><strong>Emergency Category:</strong> ${escapeHtml(ref.emergencyType)}</p>
+            <p style="margin: 2px 0;"><strong>Contact Phone:</strong> ${escapeHtml(ref.contactPhone || 'N/A')}</p>
+          </div>
+
+          <div class="admin-panel-card" style="margin: 0;">
+            <h4 style="margin: 0 0 6px; font-size: 0.9rem;">Transfer Route</h4>
+            <p style="margin: 2px 0;"><strong>Referring Facility:</strong> ${escapeHtml(ref.referringHospital?.name || 'N/A')}</p>
+            <p style="margin: 2px 0;"><strong>Referring Clinician:</strong> ${escapeHtml(ref.referringUser?.name || 'Staff Clinician')}</p>
+            <p style="margin: 2px 0;"><strong>Destination Facility:</strong> ${escapeHtml(ref.receivingHospital?.name || 'N/A')}</p>
+            <p style="margin: 2px 0;"><strong>Assigned Doctor:</strong> ${escapeHtml(ref.receivingDoctor?.name || 'Receiving Doctor')}</p>
+          </div>
+        </div>
+
+        <div class="admin-panel-card" style="margin-bottom: 14px;">
+          <h4 style="margin: 0 0 6px; font-size: 0.9rem;">Clinical Handoff &amp; Medical Observations</h4>
+          <p style="margin: 4px 0;"><strong>Chief Complaint / Problem:</strong> ${escapeHtml(ref.currentProblem)}</p>
+          <p style="margin: 4px 0;"><strong>Symptoms:</strong> ${escapeHtml(ref.symptoms)}</p>
+          <p style="margin: 4px 0;"><strong>Diagnosis / Working Diagnosis:</strong> ${escapeHtml(ref.diagnosis)}</p>
+          <p style="margin: 4px 0;"><strong>Treatments Administered:</strong> ${escapeHtml(ref.treatmentGiven)}</p>
+          ${ref.medicationsGiven ? `<p style="margin: 4px 0;"><strong>Medications:</strong> ${escapeHtml(ref.medicationsGiven)}</p>` : ''}
+          ${ref.proceduresPerformed ? `<p style="margin: 4px 0;"><strong>Procedures:</strong> ${escapeHtml(ref.proceduresPerformed)}</p>` : ''}
+          <p style="margin: 4px 0;"><strong>Clinical Condition:</strong> <span class="status-badge">${escapeHtml(ref.currentCondition)}</span></p>
+          ${ref.vitalsObservations ? `<p style="margin: 4px 0;"><strong>Vitals &amp; Parameters:</strong> ${escapeHtml(ref.vitalsObservations)}</p>` : ''}
+          <p style="margin: 4px 0;"><strong>Reason for Referral:</strong> ${escapeHtml(ref.referralReason)}</p>
+          ${ref.specialRequirements?.length ? `<p style="margin: 4px 0;"><strong>Special Requirements:</strong> ${ref.specialRequirements.map(s => `<span class="chip active">${escapeHtml(s)}</span>`).join(' ')}</p>` : ''}
+          ${ref.additionalNotes ? `<p style="margin: 4px 0; font-style: italic;"><strong>Additional Notes:</strong> "${escapeHtml(ref.additionalNotes)}"</p>` : ''}
+        </div>
+      `;
+
+      // If more info was requested or rejection reason exists
+      if (ref.rejectionReason) {
+        html += `
+          <div class="admin-panel-card" style="background: #fef2f2; border-color: #fca5a5; margin-bottom: 14px;">
+            <h4 style="color: #991b1b; margin: 0 0 4px; font-size: 0.88rem;">❌ Rejection Details</h4>
+            <p style="color: #7f1d1d; margin: 0;">Reason: "${escapeHtml(ref.rejectionReason)}"</p>
+          </div>
+        `;
+      }
+
+      if (ref.informationRequest) {
+        html += `
+          <div class="admin-panel-card" style="background: #fffbeb; border-color: #fde68a; margin-bottom: 14px;">
+            <h4 style="color: #92400e; margin: 0 0 4px; font-size: 0.88rem;">ℹ️ Information Requested by Destination Doctor</h4>
+            <p style="color: #78350f; margin: 0;">"${escapeHtml(ref.informationRequest)}"</p>
+          </div>
+        `;
+      }
+
+      // Audit History Timeline
+      if (ref.history && ref.history.length) {
+        html += `
+          <div class="admin-panel-card" style="margin-bottom: 14px;">
+            <h4 style="margin: 0 0 10px; font-size: 0.9rem;">Audit Trail &amp; Referral Lifecycle History</h4>
+            <div class="audit-timeline">
+              ${ref.history.map(h => `
+                <div class="timeline-item">
+                  <div class="timeline-meta">${new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${new Date(h.timestamp).toLocaleDateString()} by ${escapeHtml(h.userName || 'Clinician')}</div>
+                  <div class="timeline-text"><strong>${escapeHtml(h.action)}</strong> ${h.notes ? `— "${escapeHtml(h.notes)}"` : ''}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      refDetailBody.innerHTML = html;
+
+      // Build Action Buttons
+      let actionsHtml = '<button type="button" class="btn btn-ghost" id="refDetailCloseBtn2">CLOSE</button>';
+
+      if (isReceiving || currentUser.role === 'super_admin') {
+        if (ref.status === 'pending' || ref.status === 'more_information_requested') {
+          actionsHtml += `
+            <button type="button" class="btn btn-primary" id="refActionAccept">ACCEPT REFERRAL</button>
+            <button type="button" class="btn btn-outline" id="refActionMoreInfo">REQUEST MORE INFO</button>
+            <button type="button" class="btn btn-danger" id="refActionReject">REJECT REFERRAL</button>
+          `;
+        } else if (ref.status === 'transferred') {
+          actionsHtml += '<button type="button" class="btn btn-primary" id="refActionReceive">MARK PATIENT RECEIVED</button>';
+        } else if (ref.status === 'received') {
+          actionsHtml += '<button type="button" class="btn btn-primary" id="refActionComplete">COMPLETE REFERRAL</button>';
+        }
+      }
+
+      if (isReferring || currentUser.role === 'super_admin') {
+        if (ref.status === 'accepted') {
+          actionsHtml += '<button type="button" class="btn btn-primary" id="refActionTransfer">MARK PATIENT TRANSFERRED</button>';
+        }
+      }
+
+      refDetailActions.innerHTML = actionsHtml;
+
+      // Attach button events
+      const btnClose2 = document.getElementById('refDetailCloseBtn2');
+      if (btnClose2) btnClose2.addEventListener('click', closeReferralDetailModal);
+
+      const btnAccept = document.getElementById('refActionAccept');
+      if (btnAccept) btnAccept.addEventListener('click', () => handleReferralStatusChange('accept'));
+
+      const btnReject = document.getElementById('refActionReject');
+      if (btnReject) btnReject.addEventListener('click', () => {
+        if (referralRejectModalOverlay) referralRejectModalOverlay.hidden = false;
+      });
+
+      const btnMoreInfo = document.getElementById('refActionMoreInfo');
+      if (btnMoreInfo) btnMoreInfo.addEventListener('click', () => {
+        if (referralMoreInfoModalOverlay) referralMoreInfoModalOverlay.hidden = false;
+      });
+
+      const btnTransfer = document.getElementById('refActionTransfer');
+      if (btnTransfer) btnTransfer.addEventListener('click', () => handleReferralStatusChange('transfer'));
+
+      const btnReceive = document.getElementById('refActionReceive');
+      if (btnReceive) btnReceive.addEventListener('click', () => handleReferralStatusChange('receive'));
+
+      const btnComplete = document.getElementById('refActionComplete');
+      if (btnComplete) btnComplete.addEventListener('click', () => handleReferralStatusChange('complete'));
+
+    } catch (err) {
+      refDetailBody.innerHTML = `<p style="color: var(--muted); text-align: center;">Error loading referral: ${err.message}</p>`;
+    }
+  }
+
+  function closeReferralDetailModal() {
+    if (referralDetailModalOverlay) referralDetailModalOverlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  if (refDetailCloseBtn) refDetailCloseBtn.addEventListener('click', closeReferralDetailModal);
+
+  async function handleReferralStatusChange(endpoint, body = {}) {
+    if (!currentDetailReferralId) return;
+    try {
+      await apiRequest(`/referrals/${currentDetailReferralId}/${endpoint}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+      showToast('Referral status updated.');
+      openReferralDetailModal(currentDetailReferralId);
+      loadIncomingReferrals();
+      loadOutgoingReferrals();
+    } catch (err) {
+      showToast(`❌ ${err.message}`);
+    }
+  }
+
+  // Rejection Dialog Actions
+  if (rejectCancelBtn) {
+    rejectCancelBtn.addEventListener('click', () => {
+      if (referralRejectModalOverlay) referralRejectModalOverlay.hidden = true;
+    });
+  }
+
+  if (rejectConfirmBtn) {
+    rejectConfirmBtn.addEventListener('click', async () => {
+      const reason = rejectReasonInput?.value?.trim();
+      if (!reason) {
+        showToast('❌ Please specify a reason for rejection.');
+        return;
+      }
+      if (referralRejectModalOverlay) referralRejectModalOverlay.hidden = true;
+      await handleReferralStatusChange('reject', { rejectionReason: reason });
+    });
+  }
+
+  // Request More Info Dialog Actions
+  if (moreInfoCancelBtn) {
+    moreInfoCancelBtn.addEventListener('click', () => {
+      if (referralMoreInfoModalOverlay) referralMoreInfoModalOverlay.hidden = true;
+    });
+  }
+
+  if (moreInfoConfirmBtn) {
+    moreInfoConfirmBtn.addEventListener('click', async () => {
+      const info = moreInfoInput?.value?.trim();
+      if (!info) {
+        showToast('❌ Please describe the information required.');
+        return;
+      }
+      if (referralMoreInfoModalOverlay) referralMoreInfoModalOverlay.hidden = true;
+      await handleReferralStatusChange('request-info', { informationRequest: info });
+    });
+  }
+
+  // Hook into Bed Request "REFER PATIENT" button clicks
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.classList.contains('req-refer-btn')) {
+      const reqId = e.target.dataset.id;
+      const targetReq = (window._staffRequestsCache || []).find(r => r._id === reqId);
+      openReferralModal(targetReq || { _id: reqId });
+    }
+  });
+
+  // Socket.IO live notifications for referrals
+  if (typeof io !== 'undefined') {
+    try {
+      const socket = io();
+      socket.on('referral:created', (data) => {
+        const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
+        if (String(userHospId) === String(data.receivingHospital)) {
+          showToast('🔔 New emergency patient referral received!');
+          loadIncomingReferrals();
+        }
+      });
+
+      socket.on('referral:status_change', () => {
+        loadIncomingReferrals();
+        loadOutgoingReferrals();
+      });
+    } catch (e) {}
+  }
+
 })();
 

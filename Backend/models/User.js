@@ -34,9 +34,19 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'hospital_admin', 'super_admin'],
+      enum: ['user', 'hospital_admin', 'doctor', 'super_admin'],
       default: 'user',
       index: true,
+    },
+    department: {
+      type: String,
+      trim: true,
+      default: 'Emergency Medicine',
+    },
+    specialization: {
+      type: String,
+      trim: true,
+      default: 'Emergency Care',
     },
     hospital: {
       type: mongoose.Schema.Types.ObjectId,
