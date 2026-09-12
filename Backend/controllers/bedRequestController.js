@@ -1,4 +1,5 @@
 const BedRequest = require('../models/BedRequest');
+const BloodRequest = require('../models/BloodRequest');
 const Hospital = require('../models/Hospital');
 const {
   createReservationRequest,
@@ -61,6 +62,34 @@ const getBedRequests = async (req, res, next) => {
     let filter = {};
 
     const reqType = req.query.requestType ? req.query.requestType.toUpperCase() : null;
+
+    if (reqType === 'BLOOD') {
+      const bloodFilter = {};
+      if (req.user.role === 'user') {
+        bloodFilter['requester.user'] = req.user._id;
+      } else if (['hospital_admin', 'blood_bank_staff', 'doctor'].includes(req.user.role)) {
+        const userHosp = req.user.hospitalId || req.user.hospital?._id || req.user.hospital;
+        bloodFilter.$or = [
+          { 'recipients.hospital': userHosp },
+          { fulfillingHospital: userHosp },
+          { sourceHospital: userHosp },
+        ];
+      }
+      if (req.query.status && req.query.status !== 'all') {
+        bloodFilter.status = req.query.status;
+      }
+      const bloodReqs = await BloodRequest.find(bloodFilter)
+        .populate('recipients.hospital', 'name district area phone')
+        .populate('fulfillingHospital', 'name district phone')
+        .populate('requester.user', 'name email phone')
+        .sort({ 'bloodRequirement.urgency': 1, createdAt: -1 })
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        data: bloodReqs,
+      });
+    }
 
     if (req.user.role === 'user') {
       filter.user = req.user._id;

@@ -5,6 +5,7 @@ const {
   createBloodRequest,
   getBloodRequests,
   getBloodRequestById,
+  getMyBloodRequests,
   acceptBloodRequest,
   partiallyAcceptBloodRequest,
   rejectBloodRequest,
@@ -22,6 +23,7 @@ const {
 
 router.post('/', optionalAuth, createBloodRequestRules, validate, createBloodRequest);
 router.get('/', authenticate, getBloodRequests);
+router.get('/my-requests', authenticate, getMyBloodRequests);
 router.get('/:id', authenticate, getBloodRequestById);
 
 router.post('/:id/accept', authenticate, acceptBloodRequest);

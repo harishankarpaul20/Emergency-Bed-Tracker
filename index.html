@@ -1542,23 +1542,36 @@
         <h2 id="bloodReqModalTitle" style="margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
           <span>🩸</span> Emergency Blood Request &amp; Multi-Hospital Broadcast
         </h2>
-        <p class="eyebrow" style="margin: 2px 0 0;">State-Wide Emergency Blood Network</p>
+        <p class="eyebrow" style="margin: 2px 0 0;">State-Wide Emergency Blood Network · Dedicated Database Record</p>
       </div>
-      <span class="status-badge" style="background: #ffe4e6; color: #be123c; border-color: #fecdd3;">⚡ Simultaneous Multi-Hospital Dispatch</span>
+      <span class="status-badge" style="background: #ffe4e6; color: #be123c; border-color: #fecdd3;">⚡ Broadcast Request</span>
     </div>
 
     <form id="createBloodRequestForm" class="portal-form" style="margin-top: 14px;">
-      <!-- STEP 1: PATIENT DEMOGRAPHICS -->
+      
+      <!-- SECTION A: PATIENT DETAILS -->
       <div class="admin-panel-card" style="background: #f8fafc; border-color: #cbd5e1; margin-bottom: 14px;">
-        <h4 style="margin: 0 0 10px; font-size: 0.92rem; color: var(--secondary);">1. Patient Demographics &amp; Location</h4>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+          <h4 style="margin: 0; font-size: 0.95rem; color: var(--secondary);">A. Patient Details (Recipient)</h4>
+          <span style="font-size: 0.76rem; color: var(--muted); background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">Person receiving the blood</span>
+        </div>
+
+        <!-- Optional: Emergency Intake integration -->
+        <div id="bloodPatientIntakeSelectWrap" class="form-group ref-full-width" style="margin-bottom: 10px;" hidden>
+          <label for="bloodIntakePatientSelect" style="font-weight: 600; color: var(--primary);">📋 Auto-Populate from Existing Emergency Intake (Staff/Doctors)</label>
+          <select id="bloodIntakePatientSelect" class="form-control">
+            <option value="">-- Select Existing Patient from Emergency Intake --</option>
+          </select>
+        </div>
+
         <div class="ref-identity-grid">
           <div class="form-group ref-full-width">
             <label for="bloodPatientName">Patient Full Name *</label>
-            <input type="text" id="bloodPatientName" required class="form-control" placeholder="Enter patient's full name">
+            <input type="text" id="bloodPatientName" required class="form-control" placeholder="Enter patient's full name (e.g. My Friend, Relative, Patient)">
           </div>
           <div class="form-group">
             <label for="bloodPatientAge">Age (Years) *</label>
-            <input type="number" id="bloodPatientAge" required min="0" max="120" value="35" class="form-control">
+            <input type="number" id="bloodPatientAge" required min="0" max="120" value="28" class="form-control">
           </div>
           <div class="form-group">
             <label for="bloodPatientSex">Sex / Gender *</label>
@@ -1566,22 +1579,68 @@
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
             </select>
           </div>
           <div class="form-group">
-            <label for="bloodContactPhone">Emergency Contact Phone *</label>
-            <input type="tel" id="bloodContactPhone" required class="form-control" placeholder="10-digit mobile (e.g. 98300 12345)">
+            <label for="bloodContactPhone">Patient / Bedside Contact Phone *</label>
+            <input type="tel" id="bloodContactPhone" required class="form-control" placeholder="10-digit mobile number">
           </div>
           <div class="form-group">
-            <label for="bloodAdmittedHospital">Current Admitting Hospital / Bed Location</label>
-            <input type="text" id="bloodAdmittedHospital" class="form-control" placeholder="Hospital or home location">
+            <label for="bloodAdmittedHospital">Current Hospital / Facility Location</label>
+            <input type="text" id="bloodAdmittedHospital" class="form-control" placeholder="Current hospital or clinic where patient is admitted">
+          </div>
+          <div class="form-group">
+            <label for="bloodAttendingDoctor">Attending Doctor / In-Charge</label>
+            <input type="text" id="bloodAttendingDoctor" class="form-control" placeholder="Dr. Name (if known)">
           </div>
         </div>
       </div>
 
-      <!-- STEP 2: CLINICAL BLOOD REQUIREMENT -->
+      <!-- SECTION B: REQUESTER DETAILS -->
+      <div class="admin-panel-card" style="background: #eff6ff; border-color: #bfdbfe; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+          <h4 style="margin: 0; font-size: 0.95rem; color: #1e40af;">B. Requester Details (You)</h4>
+          <span style="font-size: 0.76rem; color: #1e40af; background: #dbeafe; padding: 2px 6px; border-radius: 4px;">Requester &ne; Patient supported</span>
+        </div>
+
+        <div class="ref-identity-grid">
+          <div class="form-group">
+            <label for="bloodRequesterRelation">I am requesting for *</label>
+            <select id="bloodRequesterRelation" required class="form-control">
+              <option value="Friend" selected>My Friend (Requesting for someone else)</option>
+              <option value="Family Member">My Family Member / Relative</option>
+              <option value="Self">Self (I am the patient)</option>
+              <option value="Attending Clinician">Attending Clinician / Doctor</option>
+              <option value="Hospital Staff">Hospital / Blood Bank Staff</option>
+              <option value="Other">Other Citizen Advocate</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bloodRequesterName">Requester Name *</label>
+            <input type="text" id="bloodRequesterName" required class="form-control" placeholder="Your full name">
+          </div>
+          <div class="form-group">
+            <label for="bloodRequesterContact">Requester Contact Phone *</label>
+            <input type="tel" id="bloodRequesterContact" required class="form-control" placeholder="Your mobile phone number">
+          </div>
+          <div class="form-group">
+            <label for="bloodRequesterRole">Requester Role</label>
+            <select id="bloodRequesterRole" class="form-control">
+              <option value="USER" selected>Public User / Citizen</option>
+              <option value="DOCTOR">Doctor</option>
+              <option value="HOSPITAL_STAFF">Hospital Staff</option>
+              <option value="BLOOD_BANK_STAFF">Blood Bank Staff</option>
+              <option value="HOSPITAL_ADMIN">Hospital Admin</option>
+              <option value="PATIENT">Patient</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION C: CLINICAL BLOOD REQUIREMENT -->
       <div class="admin-panel-card" style="margin-bottom: 14px;">
-        <h4 style="margin: 0 0 10px; font-size: 0.92rem; color: var(--secondary);">2. Clinical Blood Requirement &amp; Urgency</h4>
+        <h4 style="margin: 0 0 10px; font-size: 0.95rem; color: var(--secondary);">C. Blood Requirement &amp; Clinical Urgency</h4>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
           <div class="form-group">
             <label for="bloodReqGroup">Required Blood Group *</label>
@@ -1599,7 +1658,7 @@
           <div class="form-group">
             <label for="bloodReqComponent">Component Required *</label>
             <select id="bloodReqComponent" required class="form-control">
-              <option value="Whole Blood">Whole Blood</option>
+              <option value="Whole Blood" selected>Whole Blood</option>
               <option value="Packed RBC">Packed RBC (Red Blood Cells)</option>
               <option value="Platelets">Platelets (RDP / SDP)</option>
               <option value="Plasma">Fresh Frozen Plasma (FFP)</option>
@@ -1607,30 +1666,42 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="bloodReqQuantity">Units Required (1 - 20) *</label>
-            <input type="number" id="bloodReqQuantity" required min="1" max="20" value="2" class="form-control">
+            <label for="bloodReqQuantity">Quantity (Units Required) *</label>
+            <input type="number" id="bloodReqQuantity" required min="1" max="50" value="2" class="form-control">
           </div>
           <div class="form-group">
             <label for="bloodReqUrgency">Clinical Urgency *</label>
             <select id="bloodReqUrgency" required class="form-control">
-              <option value="Emergency" selected>🚨 Critical Emergency (Immediate Life-Threatening)</option>
-              <option value="Urgent">⚠️ Urgent (Within 2-4 Hours)</option>
-              <option value="Standard">Standard / Planned Procedure</option>
+              <option value="EMERGENCY" selected>🚨 EMERGENCY (Immediate Life Threat)</option>
+              <option value="URGENT">⚠️ URGENT (Within 2-4 Hours)</option>
+              <option value="NORMAL">NORMAL (Planned / Routine)</option>
             </select>
           </div>
         </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+          <div class="form-group">
+            <label for="bloodReqDateTime">Required By Date / Time</label>
+            <input type="datetime-local" id="bloodReqDateTime" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="bloodReqReason">Medical Reason / Clinical Indication *</label>
+            <input type="text" id="bloodReqReason" required class="form-control" placeholder="e.g. Emergency polytrauma, postpartum hemorrhage, surgery">
+          </div>
+        </div>
+
         <div class="form-group" style="margin-top: 12px;">
-          <label for="bloodReqNotes">Clinical Indication / Diagnosis / Doctor's Notes *</label>
-          <textarea id="bloodReqNotes" rows="2" required class="form-control" placeholder="e.g. Major postpartum hemorrhage, severe polytrauma with active arterial bleeding, sickle cell crisis..."></textarea>
+          <label for="bloodReqNotes">Additional Notes / Special Instructions</label>
+          <textarea id="bloodReqNotes" rows="2" class="form-control" placeholder="e.g. Please arrange irradiated units if possible, patient has anti-D antibodies..."></textarea>
         </div>
       </div>
 
-      <!-- STEP 3: MULTI-HOSPITAL RECIPIENT SELECTION -->
+      <!-- SECTION D: MULTI-HOSPITAL RECIPIENTS -->
       <div class="admin-panel-card" style="margin-bottom: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
           <div>
-            <h4 style="margin: 0; font-size: 0.92rem; color: var(--secondary);">3. Target Hospital Blood Banks (Multi-Select)</h4>
-            <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--muted);">Broadcast this emergency request simultaneously to multiple hospital blood banks.</p>
+            <h4 style="margin: 0; font-size: 0.95rem; color: var(--secondary);">D. Select Target Hospital Blood Banks (Recipients)</h4>
+            <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--muted);">One main blood request is created with multiple recipients. The clicked hospital is pre-selected.</p>
           </div>
           <div style="display: flex; gap: 6px;">
             <button type="button" class="btn btn-outline btn-xs" id="selectAllHospitalsInDistrictBtn">Select All in District</button>
@@ -1639,7 +1710,7 @@
         </div>
 
         <div id="targetHospitalChecklist" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: #fff;">
-          <!-- Checkbox items injected dynamically with compatible stock counts -->
+          <!-- Injected dynamically with compatible stock counts -->
         </div>
         <div id="targetHospCountSummary" style="font-size: 0.8rem; color: var(--primary); font-weight: 600; margin-top: 6px;">
           Selected: 0 blood bank(s)
@@ -1648,9 +1719,58 @@
 
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
         <button type="button" class="btn btn-ghost" id="bloodReqCancelBtn">CANCEL</button>
-        <button type="submit" class="btn btn-blood" id="bloodReqSubmitBtn">🚀 DISPATCH BLOOD REQUEST</button>
+        <button type="submit" class="btn btn-blood" id="bloodReqSubmitBtn">🚀 SEND BLOOD REQUEST</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ================= BLOOD REQUEST SUBMISSION SUCCESS MODAL ================= -->
+<div class="modal-overlay" id="bloodRequestSuccessModalOverlay" hidden>
+  <div class="modal modal-md" role="dialog" aria-modal="true" aria-labelledby="bloodSuccessModalTitle" style="text-align: center; padding: 24px; max-width: 520px;">
+    <div style="font-size: 3rem; line-height: 1; margin-bottom: 10px;">🩸</div>
+    <h2 id="bloodSuccessModalTitle" style="margin: 0 0 4px; font-size: 1.35rem; color: #be123c;">Blood Request Sent Successfully</h2>
+    <p class="eyebrow" style="margin: 0 0 16px;">Saved in Dedicated Database Collection (bloodrequests)</p>
+
+    <div class="admin-panel-card" style="text-align: left; background: #fdf2f8; border-color: #fbcfe8; margin-bottom: 16px; font-size: 0.88rem;">
+      <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #f472b6; padding-bottom: 8px; margin-bottom: 8px;">
+        <span>Request ID:</span>
+        <strong id="successReqId" style="font-family: monospace; font-size: 1.1rem; color: #be123c;">BR-10025</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>Patient:</span>
+        <strong id="successPatientName">—</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>Requested By:</span>
+        <strong id="successRequesterName">—</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>Blood Requirement:</span>
+        <strong id="successBloodReq" style="color: #be123c;">—</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>Quantity:</span>
+        <strong id="successUnits">—</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>Hospitals Contacted:</span>
+        <strong id="successHospCount">—</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #f472b6;">
+        <span>Current Status:</span>
+        <span class="status-badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;">🟡 Awaiting Hospital Response</span>
+      </div>
+    </div>
+
+    <p style="font-size: 0.8rem; color: var(--muted); margin: 0 0 16px;">
+      This request has been dispatched to the selected receiving hospitals' doctor/staff portal in real time.
+    </p>
+
+    <div style="display: flex; gap: 8px; justify-content: center;">
+      <button type="button" class="btn btn-outline" id="bloodSuccessTrackBtn">📋 View in Staff/Doctor Portal</button>
+      <button type="button" class="btn btn-blood" id="bloodSuccessCloseBtn">Done</button>
+    </div>
   </div>
 </div>
 

@@ -17,6 +17,7 @@ const { connectDB, disconnectDB } = require('../config/db');
 const Hospital = require('../models/Hospital');
 const Bed = require('../models/Bed');
 const BedRequest = require('../models/BedRequest');
+const BloodRequest = require('../models/BloodRequest');
 const BloodInventory = require('../models/BloodInventory');
 const Donor = require('../models/Donor');
 const AuditLog = require('../models/AuditLog');
@@ -172,35 +173,45 @@ async function runBloodBankTests() {
     });
     testBloodRequestId = createReqRes.body?.data?._id;
     const recipientsLen = createReqRes.body?.data?.recipients?.length;
-    logTest(5, 'Create multi-hospital blood request broadcasts to all selected blood banks',
-      createReqRes.status === 201 && recipientsLen === 3 && createReqRes.body?.data?.requestType === 'BLOOD',
-      'Request ID: ' + testBloodRequestId + ', Recipients: ' + recipientsLen
+    const reqCode = createReqRes.body?.data?.requestId;
+    
+    // Direct MongoDB check on dedicated bloodrequests collection
+    const inDb = await BloodRequest.findById(testBloodRequestId);
+    const inDedicatedCollection = inDb && inDb.collection.name === 'bloodrequests';
+    const hasBrPrefix = Boolean(reqCode && reqCode.startsWith('BR-'));
+    const hasSeparatePatientAndRequester = Boolean(inDb && inDb.patient?.name === 'Kunal Ghosh' && inDb.requester?.name);
+
+    logTest(5, 'Create multi-hospital blood request in dedicated bloodrequests collection',
+      createReqRes.status === 201 && recipientsLen === 3 && inDedicatedCollection && hasBrPrefix && hasSeparatePatientAndRequester,
+      'Request ID: ' + reqCode + ', Collection: ' + (inDb?.collection.name) + ', Recipients: ' + recipientsLen
     );
 
     // --- TEST 6: Blood Request Displayed in Unified Doctor/Staff Requests ---
     const doctorRequestsRes = await requestJson(BASE_URL + '/bed-requests?requestType=BLOOD', {
       headers: { Authorization: 'Bearer ' + tokenB },
     });
-    const foundInDocPortal = doctorRequestsRes.body?.data?.some(r => r._id === testBloodRequestId);
+    const foundInDocPortal = doctorRequestsRes.body?.data?.some(r => r._id === testBloodRequestId || r.requestId === reqCode);
     logTest(6, 'Blood request appears in the existing doctor/staff request portal',
       doctorRequestsRes.status === 200 && foundInDocPortal,
       'Found in Hospital B requests: ' + foundInDocPortal
     );
 
     // --- TEST 7: Emergency Requests Priority ---
-    const highUrgencyFirst = doctorRequestsRes.body?.data?.[0]?.urgency?.toLowerCase() === 'emergency';
+    const highUrgencyFirst = (doctorRequestsRes.body?.data?.[0]?.urgency || doctorRequestsRes.body?.data?.[0]?.bloodRequirement?.urgency || '').toLowerCase() === 'emergency';
     logTest(7, 'Emergency blood requests receive top priority in doctor/staff portal',
       highUrgencyFirst,
-      'Top request priority: ' + doctorRequestsRes.body?.data?.[0]?.urgency
+      'Top request priority: ' + (doctorRequestsRes.body?.data?.[0]?.urgency || doctorRequestsRes.body?.data?.[0]?.bloodRequirement?.urgency)
     );
 
     // --- TEST 8: Query Single Blood Request Details ---
     const singleReqRes = await requestJson(BASE_URL + '/blood-requests/' + testBloodRequestId, {
       headers: { Authorization: 'Bearer ' + tokenDocA },
     });
+    const singlePatName = singleReqRes.body?.data?.patient?.name || singleReqRes.body?.data?.patientName;
+    const singleBloodGroup = singleReqRes.body?.data?.bloodRequirement?.bloodGroup || singleReqRes.body?.data?.bloodGroup;
     logTest(8, 'Clinician retrieves complete patient details & recipient status breakdown',
-      singleReqRes.status === 200 && singleReqRes.body?.data?.patientName === 'Kunal Ghosh',
-      'Patient: ' + singleReqRes.body?.data?.patientName + ' (' + singleReqRes.body?.data?.bloodGroup + ')'
+      singleReqRes.status === 200 && singlePatName === 'Kunal Ghosh',
+      'Patient: ' + singlePatName + ' (' + singleBloodGroup + ')'
     );
 
     // --- TEST 9: Hospital B Accepts Request -> Atomic Unit Reservation ---

@@ -3082,23 +3082,93 @@
     });
   }
 
-  // --- 5. MULTI-HOSPITAL BLOOD REQUEST MODAL ---
-  function openBloodRequestModal(preselectedHospId = null, patientData = null) {
+  // --- 5. MULTI-HOSPITAL BLOOD REQUEST MODAL (PATIENT VS REQUESTER) ---
+  const bloodPatientIntakeSelectWrap = document.getElementById('bloodPatientIntakeSelectWrap');
+  const bloodIntakePatientSelect = document.getElementById('bloodIntakePatientSelect');
+  const bloodAttendingDoctor = document.getElementById('bloodAttendingDoctor');
+  const bloodRequesterRelation = document.getElementById('bloodRequesterRelation');
+  const bloodRequesterName = document.getElementById('bloodRequesterName');
+  const bloodRequesterContact = document.getElementById('bloodRequesterContact');
+  const bloodRequesterRole = document.getElementById('bloodRequesterRole');
+  const bloodReqDateTime = document.getElementById('bloodReqDateTime');
+  const bloodReqReason = document.getElementById('bloodReqReason');
+
+  const bloodRequestSuccessModalOverlay = document.getElementById('bloodRequestSuccessModalOverlay');
+  const successReqId = document.getElementById('successReqId');
+  const successPatientName = document.getElementById('successPatientName');
+  const successRequesterName = document.getElementById('successRequesterName');
+  const successBloodReq = document.getElementById('successBloodReq');
+  const successUnits = document.getElementById('successUnits');
+  const successHospCount = document.getElementById('successHospCount');
+  const bloodSuccessCloseBtn = document.getElementById('bloodSuccessCloseBtn');
+  const bloodSuccessTrackBtn = document.getElementById('bloodSuccessTrackBtn');
+
+  async function openBloodRequestModal(preselectedHospId = null, patientData = null) {
     if (!bloodRequestModalOverlay) return;
     bloodRequestModalOverlay.hidden = false;
     document.body.style.overflow = 'hidden';
 
-    // Pre-fill patient details if provided
+    // 1. Auto-fill Requester Details if user is authenticated
+    if (currentUser) {
+      if (bloodRequesterName && !bloodRequesterName.value) {
+        bloodRequesterName.value = currentUser.name || '';
+      }
+      if (bloodRequesterContact && !bloodRequesterContact.value) {
+        bloodRequesterContact.value = currentUser.phone || currentUser.email || '';
+      }
+      if (bloodRequesterRole) {
+        const r = (currentUser.role || 'USER').toUpperCase();
+        bloodRequesterRole.value = ['DOCTOR', 'HOSPITAL_STAFF', 'BLOOD_BANK_STAFF', 'HOSPITAL_ADMIN', 'PATIENT'].includes(r) ? r : 'USER';
+      }
+      if (bloodRequesterRelation && currentUser.role === 'doctor') {
+        bloodRequesterRelation.value = 'Attending Clinician';
+      }
+    }
+
+    // 2. Pre-fill patient details if provided
     if (patientData) {
       if (bloodPatientName) bloodPatientName.value = patientData.patientName || '';
-      if (bloodPatientAge) bloodPatientAge.value = patientData.patientAge || 35;
-      if (bloodPatientSex) bloodPatientSex.value = patientData.patientSex || 'Male';
+      if (bloodPatientAge) bloodPatientAge.value = patientData.patientAge || patientData.age || 28;
+      if (bloodPatientSex) bloodPatientSex.value = patientData.patientSex || patientData.sex || 'Male';
       if (bloodContactPhone) bloodContactPhone.value = patientData.contactPhone || patientData.contactNumber || '';
-      if (bloodReqNotes) bloodReqNotes.value = patientData.notes || patientData.symptoms || 'Acute medical emergency requiring blood transfusion.';
+      if (bloodReqReason) bloodReqReason.value = patientData.notes || patientData.symptoms || 'Acute medical emergency requiring blood transfusion.';
       if (bloodAdmittedHospital) bloodAdmittedHospital.value = patientData.district || 'West Bengal';
     }
 
+    // 3. Populate Emergency Intake Dropdown if logged in as staff/doctor
+    if (currentUser && ['doctor', 'hospital_admin', 'blood_bank_staff'].includes(currentUser.role)) {
+      if (bloodPatientIntakeSelectWrap) bloodPatientIntakeSelectWrap.hidden = false;
+      loadEmergencyIntakesForDropdown();
+    } else {
+      if (bloodPatientIntakeSelectWrap) bloodPatientIntakeSelectWrap.hidden = true;
+    }
+
     populateTargetHospitalsChecklist(preselectedHospId);
+  }
+
+  async function loadEmergencyIntakesForDropdown() {
+    if (!bloodIntakePatientSelect) return;
+    try {
+      const res = await apiRequest('/emergency/intake');
+      const intakes = res.data || [];
+      if (!intakes.length) return;
+
+      bloodIntakePatientSelect.innerHTML = '<option value="">-- Select Existing Patient from Emergency Intake --</option>' +
+        intakes.map(p => `<option value="${p._id}" data-name="${escapeHtml(p.patientName)}" data-age="${p.age}" data-sex="${escapeHtml(p.sex)}" data-phone="${escapeHtml(p.contactNumber)}" data-reason="${escapeHtml(p.emergencyType + ': ' + p.symptoms)}">${escapeHtml(p.patientName)} (${p.age}y, ${p.sex}) - ${escapeHtml(p.emergencyType)}</option>`).join('');
+
+      bloodIntakePatientSelect.onchange = () => {
+        const opt = bloodIntakePatientSelect.selectedOptions[0];
+        if (!opt || !opt.value) return;
+        if (bloodPatientName) bloodPatientName.value = opt.dataset.name || '';
+        if (bloodPatientAge) bloodPatientAge.value = opt.dataset.age || 30;
+        if (bloodPatientSex) bloodPatientSex.value = opt.dataset.sex || 'Male';
+        if (bloodContactPhone) bloodContactPhone.value = opt.dataset.phone || '';
+        if (bloodReqReason) bloodReqReason.value = opt.dataset.reason || '';
+        if (bloodRequesterRelation) bloodRequesterRelation.value = 'Attending Clinician';
+      };
+    } catch (e) {
+      console.warn('Could not load intake patients:', e.message);
+    }
   }
 
   function closeBloodRequestModal() {
@@ -3106,8 +3176,25 @@
     document.body.style.overflow = '';
   }
 
+  function closeBloodSuccessModal() {
+    if (bloodRequestSuccessModalOverlay) bloodRequestSuccessModalOverlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
   if (bloodReqModalCloseBtn) bloodReqModalCloseBtn.addEventListener('click', closeBloodRequestModal);
   if (bloodReqCancelBtn) bloodReqCancelBtn.addEventListener('click', closeBloodRequestModal);
+  if (bloodSuccessCloseBtn) bloodSuccessCloseBtn.addEventListener('click', closeBloodSuccessModal);
+  if (bloodSuccessTrackBtn) {
+    bloodSuccessTrackBtn.addEventListener('click', () => {
+      closeBloodSuccessModal();
+      if (staffPortalSection && !staffPortalSection.hidden) {
+        switchStaffTab('blood-requests');
+      } else {
+        showToast('📋 Blood request is tracked in MongoDB Atlas under bloodrequests collection.');
+      }
+    });
+  }
+
   if (openEmergencyBloodRequestBtn) openEmergencyBloodRequestBtn.addEventListener('click', () => openBloodRequestModal());
   if (resultsEmergencyRequestBtn) resultsEmergencyRequestBtn.addEventListener('click', () => openBloodRequestModal());
 
@@ -3170,18 +3257,35 @@
       }
 
       bloodReqSubmitBtn.disabled = true;
-      bloodReqSubmitBtn.textContent = '⏳ Broadcasting Blood Request...';
+      bloodReqSubmitBtn.textContent = '⏳ Sending Blood Request to Network...';
 
       const payload = {
-        patientName: bloodPatientName.value.trim(),
-        patientAge: parseInt(bloodPatientAge.value, 10) || 35,
-        patientSex: bloodPatientSex.value,
-        contactPhone: bloodContactPhone.value.trim(),
-        bloodGroup: bloodReqGroup.value,
-        bloodComponent: bloodReqComponent.value,
-        quantity: parseInt(bloodReqQuantity.value, 10) || 1,
-        urgency: bloodReqUrgency.value,
-        notes: bloodReqNotes.value.trim() + (bloodAdmittedHospital.value ? ` (Location: ${bloodAdmittedHospital.value})` : ''),
+        // A. Separate Patient
+        patient: {
+          name: bloodPatientName.value.trim(),
+          age: parseInt(bloodPatientAge.value, 10) || 28,
+          gender: bloodPatientSex.value,
+          contactPhone: bloodContactPhone.value.trim(),
+          currentHospital: bloodAdmittedHospital ? bloodAdmittedHospital.value.trim() : undefined,
+          attendingDoctor: bloodAttendingDoctor ? bloodAttendingDoctor.value.trim() : undefined,
+        },
+        // B. Separate Requester
+        requester: {
+          name: (bloodRequesterName?.value || '').trim() || bloodPatientName.value.trim(),
+          contact: (bloodRequesterContact?.value || '').trim() || bloodContactPhone.value.trim(),
+          role: bloodRequesterRole?.value || 'USER',
+          relationshipToPatient: bloodRequesterRelation?.value || 'Friend',
+        },
+        // C. Clinical Requirement
+        bloodRequirement: {
+          bloodGroup: bloodReqGroup.value,
+          component: bloodReqComponent.value,
+          quantity: parseInt(bloodReqQuantity.value, 10) || 1,
+          urgency: bloodReqUrgency.value,
+          requiredAt: bloodReqDateTime && bloodReqDateTime.value ? new Date(bloodReqDateTime.value) : undefined,
+        },
+        reason: (bloodReqReason?.value || 'Emergency patient blood requirement').trim(),
+        notes: (bloodReqNotes?.value || '').trim(),
         targetHospitals: selectedHospitals,
       };
 
@@ -3191,17 +3295,32 @@
           body: JSON.stringify(payload),
         });
 
-        showToast(`🚨 Blood request dispatched to ${selectedHospitals.length} hospital blood bank(s) successfully!`);
+        const reqData = res.data || {};
+        const displayId = reqData.requestId || ('BR-' + (reqData._id ? reqData._id.slice(-5).toUpperCase() : '10025'));
+
         closeBloodRequestModal();
         createBloodRequestForm.reset();
-        
-        // If staff portal is open, refresh blood requests
+
+        // Show rich confirmation modal
+        if (bloodRequestSuccessModalOverlay) {
+          if (successReqId) successReqId.textContent = displayId;
+          if (successPatientName) successPatientName.textContent = payload.patient.name;
+          if (successRequesterName) successRequesterName.textContent = `${payload.requester.name} (${payload.requester.relationshipToPatient})`;
+          if (successBloodReq) successBloodReq.textContent = `${payload.bloodRequirement.bloodGroup} (${payload.bloodRequirement.component})`;
+          if (successUnits) successUnits.textContent = `${payload.bloodRequirement.quantity} Units`;
+          if (successHospCount) successHospCount.textContent = `${selectedHospitals.length} Blood Bank(s)`;
+          bloodRequestSuccessModalOverlay.hidden = false;
+        } else {
+          showToast(`🚨 Blood request ${displayId} dispatched to ${selectedHospitals.length} hospital(s) successfully!`);
+        }
+
+        // Refresh staff portal if open
         loadStaffBloodRequests();
       } catch (err) {
         showToast(`❌ Request failed: ${formatErrorMessage(err)}`);
       } finally {
         bloodReqSubmitBtn.disabled = false;
-        bloodReqSubmitBtn.textContent = '🚀 DISPATCH BLOOD REQUEST';
+        bloodReqSubmitBtn.textContent = '🚀 SEND BLOOD REQUEST';
       }
     });
   }
@@ -3276,51 +3395,85 @@
 
       // Sort: Emergency priority on top, then newest
       reqs.sort((a, b) => {
-        if (a.urgency === 'Emergency' && b.urgency !== 'Emergency') return -1;
-        if (b.urgency === 'Emergency' && a.urgency !== 'Emergency') return 1;
+        const uA = (a.bloodRequirement?.urgency || a.urgency || '').toUpperCase();
+        const uB = (b.bloodRequirement?.urgency || b.urgency || '').toUpperCase();
+        if (uA === 'EMERGENCY' && uB !== 'EMERGENCY') return -1;
+        if (uB === 'EMERGENCY' && uA !== 'EMERGENCY') return 1;
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
 
       const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
 
       container.innerHTML = reqs.map(r => {
-        const isEmergency = r.urgency === 'Emergency';
+        const urgencyVal = (r.bloodRequirement?.urgency || r.urgency || 'EMERGENCY').toUpperCase();
+        const isEmergency = urgencyVal === 'EMERGENCY';
+        const displayId = r.requestId || ('BR-' + (r._id ? r._id.slice(-5).toUpperCase() : ''));
+        const patName = r.patient?.name || r.patientName || 'Patient';
+        const patAge = r.patient?.age || r.patientAge;
+        const patSex = r.patient?.gender || r.patientSex;
+        const bGroup = r.bloodRequirement?.bloodGroup || r.bloodGroup || '';
+        const bComp = r.bloodRequirement?.component || r.bloodComponent || 'Whole Blood';
+        const bQty = r.bloodRequirement?.quantity || r.quantity || 1;
+        const reqName = r.requester?.name || 'Citizen Requester';
+        const reqRelation = r.requester?.relationshipToPatient || 'Friend';
+
         const myRecipient = (r.recipients || []).find(rec => String(rec.hospital?._id || rec.hospital) === String(userHospId));
         const myStatus = myRecipient ? myRecipient.status : r.status;
+
+        // Status badges for each recipient hospital
+        const recipientPills = (r.recipients || []).map(rec => {
+          const hName = rec.hospital?.name || 'Hospital';
+          const recStatus = rec.status || 'PENDING';
+          const badgeClass = recStatus === 'ACCEPTED' || recStatus === 'BLOOD_RESERVED' ? 'approved' : (recStatus === 'REJECTED' ? 'rejected' : 'pending');
+          return `<span class="status-badge ${badgeClass}" style="font-size: 0.72rem;">${escapeHtml(hName)}: ${escapeHtml(recStatus)}${rec.reservedUnits ? ' (' + rec.reservedUnits + 'u)' : ''}</span>`;
+        }).join(' ');
 
         return `
           <div class="staff-blood-req-card ${isEmergency ? 'is-emergency' : ''}">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
               <div>
-                <span class="blood-urgency-badge ${escapeHtml(r.urgency || 'Standard')}">
-                  ${isEmergency ? '🚨 ' : ''}${escapeHtml((r.urgency || 'Standard').toUpperCase())}
-                </span>
-                <span class="status-badge" style="margin-left: 6px; font-size: 0.75rem;">${escapeHtml(myStatus)}</span>
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                  <span class="blood-urgency-badge ${escapeHtml(urgencyVal)}">
+                    ${isEmergency ? '🚨 ' : ''}${escapeHtml(urgencyVal)}
+                  </span>
+                  <span style="font-family: monospace; font-weight: 700; color: #be123c; font-size: 0.85rem;">${escapeHtml(displayId)}</span>
+                  <span class="status-badge" style="font-size: 0.75rem;">${escapeHtml(myStatus)}</span>
+                </div>
+
                 <h4 style="margin: 6px 0 2px; font-size: 1.05rem;">
-                  ${escapeHtml(r.patientName)} · <strong style="color: #be123c;">${escapeHtml(r.bloodGroup)} (${escapeHtml(r.bloodComponent || 'Whole Blood')})</strong>
+                  ${escapeHtml(patName)} · <strong style="color: #be123c;">${escapeHtml(bGroup)} (${escapeHtml(bComp)})</strong>
                 </h4>
                 <div style="font-size: 0.82rem; color: var(--muted);">
-                  Units: <strong>${r.quantity}</strong> | Age: ${r.patientAge || '—'} | Phone: ${escapeHtml(r.contactPhone || 'Private')}
+                  Required: <strong>${bQty} Units</strong> | Age: ${patAge || '—'} | Sex: ${patSex || '—'}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--secondary); margin-top: 2px;">
+                  👤 <em>Requested by: ${escapeHtml(reqName)} (${escapeHtml(reqRelation)}) · 📞 ${escapeHtml(r.patient?.contactPhone || r.contactPhone || 'Private')}</em>
                 </div>
               </div>
               <button type="button" class="btn btn-outline btn-xs view-blood-detail-btn" data-id="${r._id}">View Details</button>
             </div>
 
-            ${r.notes ? `<div style="font-size: 0.82rem; font-style: italic; color: var(--secondary);">"${escapeHtml(r.notes)}"</div>` : ''}
+            ${(r.reason || r.notes) ? `<div style="font-size: 0.82rem; font-style: italic; color: var(--secondary); margin-top: 4px;">"${escapeHtml(r.reason || r.notes)}"</div>` : ''}
 
-            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+            <!-- Multi-hospital recipient status preview -->
+            <div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
+              <span style="font-size: 0.72rem; color: var(--muted); font-weight: 600;">Recipients (${r.recipients?.length || 0}):</span>
+              ${recipientPills}
+            </div>
+
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
               ${(myStatus === 'PENDING') ? `
                 <button type="button" class="btn btn-blood btn-xs action-accept-blood" data-id="${r._id}">✅ Accept &amp; Reserve</button>
                 <button type="button" class="btn btn-outline btn-xs action-partial-blood" data-id="${r._id}">⚡ Partial Accept</button>
                 <button type="button" class="btn btn-danger btn-xs action-reject-blood" data-id="${r._id}">❌ Reject</button>
               ` : ''}
 
-              ${(myStatus === 'BLOOD_RESERVED' || myStatus === 'PARTIALLY_ACCEPTED') ? `
+              ${(myStatus === 'BLOOD_RESERVED' || myStatus === 'ACCEPTED' || myStatus === 'PARTIALLY_ACCEPTED') ? `
                 <button type="button" class="btn btn-primary btn-xs action-complete-blood" data-id="${r._id}">✔️ Complete Collection</button>
                 <button type="button" class="btn btn-ghost btn-xs action-cancel-blood" data-id="${r._id}">Cancel Reservation</button>
               ` : ''}
 
-              <button type="button" class="btn btn-outline btn-xs action-broadcast-donor" data-id="${r._id}" data-group="${escapeHtml(r.bloodGroup)}" data-units="${r.quantity}">
+              <button type="button" class="btn btn-outline btn-xs action-broadcast-donor" data-id="${r._id}" data-group="${escapeHtml(bGroup)}" data-units="${bQty}">
                 📢 Broadcast to Donors
               </button>
             </div>
@@ -3337,7 +3490,7 @@
         btn.addEventListener('click', async () => {
           try {
             await apiRequest(`/blood-requests/${btn.dataset.id}/accept`, { method: 'POST' });
-            showToast('✅ Blood request accepted. Units reserved atomically.');
+            showToast('✅ Blood request accepted. Units reserved atomically in inventory.');
             loadStaffBloodRequests();
           } catch (e) {
             showToast(`❌ ${formatErrorMessage(e)}`);
@@ -3363,7 +3516,7 @@
         btn.addEventListener('click', async () => {
           try {
             await apiRequest(`/blood-requests/${btn.dataset.id}/complete`, { method: 'POST' });
-            showToast('✔️ Blood collection completed. Stock converted to used.');
+            showToast('✔️ Blood collection completed. Stock finalized as used.');
             loadStaffBloodRequests();
           } catch (e) {
             showToast(`❌ ${formatErrorMessage(e)}`);
@@ -3480,11 +3633,13 @@
       }
       try {
         const reqItem = cachedBloodRequests.find(r => r._id === activeBloodRequestIdForAction);
+        const reqGroup = reqItem?.bloodRequirement?.bloodGroup || reqItem?.bloodGroup || 'O-';
+        const reqQty = reqItem?.bloodRequirement?.quantity || reqItem?.quantity || 2;
         await apiRequest('/donors/emergency-broadcast', {
           method: 'POST',
           body: JSON.stringify({
-            bloodGroup: reqItem?.bloodGroup || 'O-',
-            unitsRequired: reqItem?.quantity || 2,
+            bloodGroup: reqGroup,
+            unitsRequired: reqQty,
             contactDetails: phone,
           }),
         });
@@ -3505,10 +3660,11 @@
     try {
       const res = await apiRequest(`/blood-requests/${reqId}`);
       const req = res.data;
-      if (bloodDetailSubtitle) bloodDetailSubtitle.textContent = `Request #${req._id}`;
+      const displayId = req.requestId || ('BR-' + (req._id ? req._id.slice(-5).toUpperCase() : ''));
+      if (bloodDetailSubtitle) bloodDetailSubtitle.textContent = `Request ${displayId}`;
       if (bloodDetailStatusBadge) {
         bloodDetailStatusBadge.textContent = req.status;
-        bloodDetailStatusBadge.className = `status-badge ${req.status.toLowerCase()}`;
+        bloodDetailStatusBadge.className = `status-badge ${(req.status || '').toLowerCase()}`;
       }
 
       let recipientsTable = '<p style="color: var(--muted);">No recipient hospitals recorded.</p>';
@@ -3520,7 +3676,7 @@
                 <th>Blood Bank</th>
                 <th>Status</th>
                 <th>Reserved</th>
-                <th>Notes</th>
+                <th>Response Details</th>
               </tr>
             </thead>
             <tbody>
@@ -3529,7 +3685,7 @@
                   <td><strong>${escapeHtml(rec.hospital?.name || rec.hospital || 'Hospital')}</strong></td>
                   <td><span class="status-badge ${(rec.status || '').toLowerCase()}">${escapeHtml(rec.status)}</span></td>
                   <td>${rec.reservedUnits || 0} units</td>
-                  <td>${escapeHtml(rec.notes || rec.rejectionReason || '—')}</td>
+                  <td>${escapeHtml(rec.responseReason || rec.notes || (rec.respondedAt ? 'Responded: ' + new Date(rec.respondedAt).toLocaleTimeString() : 'Awaiting action'))}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -3537,18 +3693,53 @@
         `;
       }
 
+      const patName = req.patient?.name || req.patientName || '—';
+      const patAge = req.patient?.age || req.patientAge || '—';
+      const patSex = req.patient?.gender || req.patientSex || '—';
+      const patContact = req.patient?.contactPhone || req.contactPhone || 'Private';
+      const patHosp = req.patient?.currentHospital || 'In-Transit / Clinic';
+      const patDoc = req.patient?.attendingDoctor || 'Not specified';
+
+      const reqName = req.requester?.name || 'Public Requester';
+      const reqContact = req.requester?.contact || 'Private';
+      const reqRole = req.requester?.role || 'USER';
+      const reqRel = req.requester?.relationshipToPatient || 'Friend';
+
+      const bGroup = req.bloodRequirement?.bloodGroup || req.bloodGroup || '';
+      const bComp = req.bloodRequirement?.component || req.bloodComponent || 'Whole Blood';
+      const bQty = req.bloodRequirement?.quantity || req.quantity || 1;
+      const bUrg = req.bloodRequirement?.urgency || req.urgency || 'EMERGENCY';
+
       bloodDetailBody.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div class="admin-panel-card" style="background: #f8fafc;">
+            <h4 style="margin: 0 0 6px; font-size: 0.92rem; color: var(--secondary);">A. Patient Demographics</h4>
+            <p style="margin: 0 0 4px;"><strong>Name:</strong> ${escapeHtml(patName)} (${patAge}y, ${patSex})</p>
+            <p style="margin: 0 0 4px;"><strong>Patient Phone:</strong> ${escapeHtml(patContact)}</p>
+            <p style="margin: 0 0 4px;"><strong>Admitted At:</strong> ${escapeHtml(patHosp)}</p>
+            <p style="margin: 0;"><strong>Attending Doctor:</strong> ${escapeHtml(patDoc)}</p>
+          </div>
+
+          <div class="admin-panel-card" style="background: #eff6ff;">
+            <h4 style="margin: 0 0 6px; font-size: 0.92rem; color: #1e40af;">B. Requester Details</h4>
+            <p style="margin: 0 0 4px;"><strong>Requester:</strong> ${escapeHtml(reqName)}</p>
+            <p style="margin: 0 0 4px;"><strong>Relation:</strong> ${escapeHtml(reqRel)}</p>
+            <p style="margin: 0 0 4px;"><strong>Role:</strong> ${escapeHtml(reqRole)}</p>
+            <p style="margin: 0;"><strong>Contact Phone:</strong> ${escapeHtml(reqContact)}</p>
+          </div>
+        </div>
+
         <div class="admin-panel-card" style="margin-bottom: 12px;">
-          <h4 style="margin: 0 0 6px; font-size: 0.95rem;">Patient Identity &amp; Clinical Need</h4>
-          <p style="margin: 0 0 4px;"><strong>Patient:</strong> ${escapeHtml(req.patientName)} (${req.patientAge || '—'}y, ${req.patientSex || '—'})</p>
-          <p style="margin: 0 0 4px;"><strong>Blood Needed:</strong> ${escapeHtml(req.bloodGroup)} · ${escapeHtml(req.bloodComponent || 'Whole Blood')} (${req.quantity} Units)</p>
-          <p style="margin: 0 0 4px;"><strong>Urgency:</strong> <span class="blood-urgency-badge ${escapeHtml(req.urgency)}">${escapeHtml(req.urgency)}</span></p>
-          <p style="margin: 0 0 4px;"><strong>Contact Phone:</strong> ${escapeHtml(req.contactPhone || 'Private')}</p>
-          <p style="margin: 0;"><strong>Diagnosis / Indication:</strong> "${escapeHtml(req.notes || 'Emergency requirement')}"</p>
+          <h4 style="margin: 0 0 6px; font-size: 0.92rem;">C. Clinical Blood Requirement</h4>
+          <p style="margin: 0 0 4px;"><strong>Blood Group &amp; Component:</strong> <strong style="color: #be123c;">${escapeHtml(bGroup)} (${escapeHtml(bComp)})</strong></p>
+          <p style="margin: 0 0 4px;"><strong>Units Needed:</strong> ${bQty} Units</p>
+          <p style="margin: 0 0 4px;"><strong>Clinical Urgency:</strong> <span class="blood-urgency-badge ${escapeHtml(bUrg)}">${escapeHtml(bUrg)}</span></p>
+          <p style="margin: 0 0 4px;"><strong>Medical Indication:</strong> "${escapeHtml(req.reason || 'Emergency requirement')}"</p>
+          ${req.notes ? `<p style="margin: 0;"><strong>Notes:</strong> ${escapeHtml(req.notes)}</p>` : ''}
         </div>
 
         <div class="admin-panel-card">
-          <h4 style="margin: 0 0 6px; font-size: 0.95rem;">Multi-Hospital Broadcast Status (${req.recipients ? req.recipients.length : 0} Facilities)</h4>
+          <h4 style="margin: 0 0 6px; font-size: 0.92rem;">D. Multi-Hospital Broadcast Status (${req.recipients ? req.recipients.length : 0} Facilities)</h4>
           <div class="table-responsive">${recipientsTable}</div>
         </div>
       `;
