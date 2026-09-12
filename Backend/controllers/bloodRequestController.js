@@ -93,12 +93,14 @@ const createBloodRequest = async (req, res, next) => {
       defaultUserId = fallbackAdmin ? fallbackAdmin._id : undefined;
     }
 
+    const isSelf = (requesterInput?.relationshipToPatient || relationshipToPatient) === 'Self';
+    const fallbackRequesterName = req.user ? req.user.name : (isSelf ? resolvedPatient.name : 'Citizen Requester');
     const resolvedRequester = {
       user: req.user ? req.user._id : defaultUserId,
-      name: (requesterInput?.name || requesterName || (req.user ? req.user.name : resolvedPatient.name)).trim(),
-      contact: (requesterInput?.contact || requesterContact || (req.user ? (req.user.phone || req.user.email) : resolvedPatient.contactPhone) || '').trim(),
+      name: (requesterInput?.name || requesterName || fallbackRequesterName).trim(),
+      contact: (requesterInput?.contact || requesterContact || (req.user ? (req.user.phone || req.user.email) : (isSelf ? resolvedPatient.contactPhone : '')) || '').trim(),
       role: (requesterInput?.role || requesterRole || (req.user ? req.user.role.toUpperCase() : 'USER')),
-      relationshipToPatient: requesterInput?.relationshipToPatient || relationshipToPatient || (req.user && req.user.name === resolvedPatient.name ? 'Self' : 'Friend'),
+      relationshipToPatient: requesterInput?.relationshipToPatient || relationshipToPatient || (isSelf || (req.user && req.user.name === resolvedPatient.name) ? 'Self' : 'Friend'),
     };
 
     // Standardize role enum
@@ -309,15 +311,20 @@ const getBloodRequestById = async (req, res, next) => {
  */
 const getMyBloodRequests = async (req, res, next) => {
   try {
-    const filter = {
-      $or: [
-        { 'requester.user': req.user._id },
-        { 'patient.contactPhone': req.user.phone },
-        { 'requester.contact': req.user.phone },
-      ],
-    };
+    const orConditions = [{ 'requester.user': req.user._id }];
+    if (req.user.phone && String(req.user.phone).trim()) {
+      const p = String(req.user.phone).trim();
+      orConditions.push({ 'patient.contactPhone': p });
+      orConditions.push({ 'requester.contact': p });
+    }
+    if (req.user.email && String(req.user.email).trim()) {
+      orConditions.push({ 'requester.contact': String(req.user.email).trim() });
+    }
+    if (req.user.name && String(req.user.name).trim()) {
+      orConditions.push({ 'requester.name': new RegExp('^' + String(req.user.name).trim() + '$', 'i') });
+    }
 
-    const requests = await BloodRequest.find(filter)
+    const requests = await BloodRequest.find({ $or: orConditions })
       .populate('recipients.hospital', 'name district area phone')
       .populate('fulfillingHospital', 'name district phone')
       .sort({ createdAt: -1 })

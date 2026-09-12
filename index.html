@@ -117,6 +117,9 @@
           <button type="button" class="btn btn-blood btn-lg" id="openEmergencyBloodRequestBtn">
             🚨 Dispatch Emergency Blood Request
           </button>
+          <button type="button" class="btn btn-outline-white" id="openMyBloodRequestsBtn">
+            📋 My Blood Requests
+          </button>
           <a href="#volunteer-donor-section" class="btn btn-outline-white" id="scrollToDonorFormBtn">
             ❤️ Volunteer as Donor
           </a>
@@ -211,9 +214,14 @@
             <h3 id="bloodResultsTitle" style="margin: 0; font-size: 1.25rem;">Participating Hospital Blood Banks</h3>
             <p id="bloodResultsMeta" style="margin: 2px 0 0; font-size: 0.84rem; color: var(--muted);">Showing all verified blood banks in West Bengal</p>
           </div>
-          <button type="button" class="btn btn-blood btn-sm" id="resultsEmergencyRequestBtn">
-            🚨 Request Blood from Multiple Hospitals
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-outline btn-sm" id="myBloodRequestsBtn">
+              📋 My Blood Requests
+            </button>
+            <button type="button" class="btn btn-blood btn-sm" id="resultsEmergencyRequestBtn">
+              🚨 Request Blood from Multiple Hospitals
+            </button>
+          </div>
         </div>
 
         <div class="blood-grid" id="bloodResultsGrid" style="margin-top: 16px;">
@@ -1767,9 +1775,31 @@
       This request has been dispatched to the selected receiving hospitals' doctor/staff portal in real time.
     </p>
 
-    <div style="display: flex; gap: 8px; justify-content: center;">
-      <button type="button" class="btn btn-outline" id="bloodSuccessTrackBtn">📋 View in Staff/Doctor Portal</button>
+    <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+      <button type="button" class="btn btn-outline" id="bloodSuccessTrackBtn">📋 Track in My Blood Requests</button>
       <button type="button" class="btn btn-blood" id="bloodSuccessCloseBtn">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MY BLOOD REQUESTS TRACKING MODAL ================= -->
+<div class="modal-overlay" id="myBloodRequestsModalOverlay" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="myBloodReqModalTitle" style="max-height: 90vh; overflow-y: auto;">
+    <button class="modal-close" id="myBloodReqModalCloseBtn" aria-label="Close my blood requests">✕</button>
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+      <div>
+        <h2 id="myBloodReqModalTitle" style="margin: 0; font-size: 1.25rem;">📋 My Emergency Blood Requests</h2>
+        <p class="eyebrow" style="margin: 2px 0 0;">Track your blood requests dispatched across West Bengal</p>
+      </div>
+      <button type="button" class="btn btn-outline btn-xs" id="refreshMyBloodRequestsBtn">🔄 Refresh</button>
+    </div>
+
+    <div id="myBloodRequestsContainer" style="margin-top: 14px;">
+      <!-- Populated dynamically -->
+    </div>
+
+    <div class="modal-footer" style="margin-top: 16px; display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-ghost" id="closeMyBloodReqFooterBtn">Close</button>
     </div>
   </div>
 </div>

@@ -3110,10 +3110,10 @@
 
     // 1. Auto-fill Requester Details if user is authenticated
     if (currentUser) {
-      if (bloodRequesterName && !bloodRequesterName.value) {
+      if (bloodRequesterName) {
         bloodRequesterName.value = currentUser.name || '';
       }
-      if (bloodRequesterContact && !bloodRequesterContact.value) {
+      if (bloodRequesterContact) {
         bloodRequesterContact.value = currentUser.phone || currentUser.email || '';
       }
       if (bloodRequesterRole) {
@@ -3125,7 +3125,7 @@
       }
     }
 
-    // 2. Pre-fill patient details if provided
+    // 2. Pre-fill patient details if provided, else keep clear so user enters actual patient
     if (patientData) {
       if (bloodPatientName) bloodPatientName.value = patientData.patientName || '';
       if (bloodPatientAge) bloodPatientAge.value = patientData.patientAge || patientData.age || 28;
@@ -3133,6 +3133,8 @@
       if (bloodContactPhone) bloodContactPhone.value = patientData.contactPhone || patientData.contactNumber || '';
       if (bloodReqReason) bloodReqReason.value = patientData.notes || patientData.symptoms || 'Acute medical emergency requiring blood transfusion.';
       if (bloodAdmittedHospital) bloodAdmittedHospital.value = patientData.district || 'West Bengal';
+    } else {
+      if (bloodPatientName) bloodPatientName.value = '';
     }
 
     // 3. Populate Emergency Intake Dropdown if logged in as staff/doctor
@@ -3184,14 +3186,167 @@
   if (bloodReqModalCloseBtn) bloodReqModalCloseBtn.addEventListener('click', closeBloodRequestModal);
   if (bloodReqCancelBtn) bloodReqCancelBtn.addEventListener('click', closeBloodRequestModal);
   if (bloodSuccessCloseBtn) bloodSuccessCloseBtn.addEventListener('click', closeBloodSuccessModal);
+
+  // Dynamic relation toggle
+  if (bloodRequesterRelation) {
+    bloodRequesterRelation.addEventListener('change', () => {
+      if (bloodRequesterRelation.value === 'Self') {
+        if (bloodPatientName) {
+          bloodPatientName.value = bloodRequesterName ? (bloodRequesterName.value || (currentUser ? currentUser.name : '')) : '';
+        }
+      } else {
+        if (bloodPatientName && bloodRequesterName && bloodPatientName.value === bloodRequesterName.value) {
+          bloodPatientName.value = '';
+          bloodPatientName.focus();
+        }
+      }
+    });
+  }
+
+  // --- MY BLOOD REQUESTS TRACKING MODAL ---
+  const myBloodRequestsModalOverlay = document.getElementById('myBloodRequestsModalOverlay');
+  const myBloodReqModalCloseBtn = document.getElementById('myBloodReqModalCloseBtn');
+  const closeMyBloodReqFooterBtn = document.getElementById('closeMyBloodReqFooterBtn');
+  const refreshMyBloodRequestsBtn = document.getElementById('refreshMyBloodRequestsBtn');
+  const myBloodRequestsContainer = document.getElementById('myBloodRequestsContainer');
+  const openMyBloodRequestsBtn = document.getElementById('openMyBloodRequestsBtn');
+  const myBloodRequestsBtn = document.getElementById('myBloodRequestsBtn');
+
+  function closeMyBloodRequestsModal() {
+    if (myBloodRequestsModalOverlay) myBloodRequestsModalOverlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  async function openMyBloodRequestsModal() {
+    if (!myBloodRequestsModalOverlay) return;
+    myBloodRequestsModalOverlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    await loadMyBloodRequests();
+  }
+
+  async function loadMyBloodRequests() {
+    if (!myBloodRequestsContainer) return;
+
+    if (!authToken) {
+      myBloodRequestsContainer.innerHTML = `
+        <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border);">
+          <div style="font-size: 2.5rem; margin-bottom: 8px;">🔐</div>
+          <h4 style="margin: 0 0 6px;">Login to Track Your Blood Requests</h4>
+          <p style="color: var(--muted); font-size: 0.86rem; margin-bottom: 16px;">
+            Please log in with your citizen account to track your submitted blood requests and see hospital fulfillment status.
+          </p>
+          <button type="button" class="btn btn-primary" id="loginToTrackBloodBtn">Log In / Register</button>
+        </div>
+      `;
+      document.getElementById('loginToTrackBloodBtn')?.addEventListener('click', () => {
+        closeMyBloodRequestsModal();
+        openAuthModal('citizen');
+      });
+      return;
+    }
+
+    myBloodRequestsContainer.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem; text-align: center; padding: 18px;">⏳ Loading your blood requests...</p>';
+
+    try {
+      const res = await apiRequest('/blood-requests/my-requests');
+      const reqs = res.data || [];
+
+      if (!reqs.length) {
+        myBloodRequestsContainer.innerHTML = `
+          <div style="text-align: center; padding: 24px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 2.5rem; margin-bottom: 8px;">🩸</div>
+            <h4 style="margin: 0 0 6px;">No Blood Requests Found</h4>
+            <p style="color: var(--muted); font-size: 0.86rem; margin-bottom: 14px;">
+              You have not submitted any emergency blood requests yet.
+            </p>
+            <button type="button" class="btn btn-blood btn-sm" id="emptyDispatchBloodBtn">🚨 Dispatch Emergency Blood Request</button>
+          </div>
+        `;
+        document.getElementById('emptyDispatchBloodBtn')?.addEventListener('click', () => {
+          closeMyBloodRequestsModal();
+          openBloodRequestModal();
+        });
+        return;
+      }
+
+      myBloodRequestsContainer.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          ${reqs.map(r => {
+            const displayId = r.requestId || ('BR-' + (r._id ? r._id.slice(-5).toUpperCase() : ''));
+            const patName = r.patient?.name || r.patientName || 'Patient';
+            const patAge = r.patient?.age || r.patientAge;
+            const patSex = r.patient?.gender || r.patientSex;
+            const bGroup = r.bloodRequirement?.bloodGroup || r.bloodGroup || '';
+            const bComp = r.bloodRequirement?.component || r.bloodComponent || 'Whole Blood';
+            const bQty = r.bloodRequirement?.quantity || r.quantity || 1;
+            const urg = (r.bloodRequirement?.urgency || r.urgency || 'EMERGENCY').toUpperCase();
+            const statusClass = (r.status || 'PENDING').toLowerCase();
+
+            const recipientBadges = (r.recipients || []).map(rec => {
+              const hName = rec.hospital?.name || 'Hospital';
+              const s = rec.status || 'PENDING';
+              const sc = s === 'ACCEPTED' || s === 'BLOOD_RESERVED' ? 'approved' : (s === 'REJECTED' ? 'rejected' : 'pending');
+              return `<span class="status-badge ${sc}" style="font-size: 0.72rem;">${escapeHtml(hName)}: ${escapeHtml(s)}</span>`;
+            }).join(' ');
+
+            return `
+              <div class="admin-panel-card" style="background: #ffffff; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap;">
+                  <div>
+                    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 4px; flex-wrap: wrap;">
+                      <span style="font-family: monospace; font-weight: 700; color: #be123c; font-size: 0.9rem;">${escapeHtml(displayId)}</span>
+                      <span class="blood-urgency-badge ${escapeHtml(urg)}" style="font-size: 0.72rem;">${escapeHtml(urg)}</span>
+                      <span class="status-badge ${statusClass}" style="font-size: 0.75rem;">Status: ${escapeHtml(r.status)}</span>
+                    </div>
+
+                    <h4 style="margin: 4px 0 2px; font-size: 1.05rem; color: #0f172a;">
+                      👤 Patient: <strong style="color: #be123c;">${escapeHtml(patName)}</strong>
+                      <span style="font-size: 0.82rem; font-weight: normal; color: var(--muted);">(${patAge ? patAge + 'y' : ''}${patSex ? ', ' + escapeHtml(patSex) : ''})</span>
+                    </h4>
+
+                    <div style="font-size: 0.88rem; margin-top: 3px;">
+                      🩸 Blood: <strong style="color: #be123c;">${escapeHtml(bGroup)} (${escapeHtml(bComp)})</strong> &nbsp;|&nbsp; 📦 Quantity: <strong>${bQty} Units</strong>
+                    </div>
+
+                    <div style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">
+                      Dispatched on ${new Date(r.createdAt).toLocaleString()} &middot; Target Blood Banks (${r.recipients?.length || 0})
+                    </div>
+
+                    <div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">
+                      ${recipientBadges}
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn-outline btn-xs view-my-blood-detail-btn" data-id="${r._id}">View Full Details</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      myBloodRequestsContainer.querySelectorAll('.view-my-blood-detail-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          closeMyBloodRequestsModal();
+          openBloodRequestDetailModal(btn.dataset.id);
+        });
+      });
+    } catch (e) {
+      myBloodRequestsContainer.innerHTML = `<p style="color: var(--danger); text-align: center; padding: 14px;">❌ Error loading requests: ${escapeHtml(e.message)}</p>`;
+    }
+  }
+
+  if (myBloodReqModalCloseBtn) myBloodReqModalCloseBtn.addEventListener('click', closeMyBloodRequestsModal);
+  if (closeMyBloodReqFooterBtn) closeMyBloodReqFooterBtn.addEventListener('click', closeMyBloodRequestsModal);
+  if (refreshMyBloodRequestsBtn) refreshMyBloodRequestsBtn.addEventListener('click', () => loadMyBloodRequests());
+
+  if (openMyBloodRequestsBtn) openMyBloodRequestsBtn.addEventListener('click', openMyBloodRequestsModal);
+  if (myBloodRequestsBtn) myBloodRequestsBtn.addEventListener('click', openMyBloodRequestsModal);
+
   if (bloodSuccessTrackBtn) {
     bloodSuccessTrackBtn.addEventListener('click', () => {
       closeBloodSuccessModal();
-      if (staffPortalSection && !staffPortalSection.hidden) {
-        switchStaffTab('blood-requests');
-      } else {
-        showToast('📋 Blood request is tracked in MongoDB Atlas under bloodrequests collection.');
-      }
+      openMyBloodRequestsModal();
     });
   }
 
@@ -3271,8 +3426,8 @@
         },
         // B. Separate Requester
         requester: {
-          name: (bloodRequesterName?.value || '').trim() || bloodPatientName.value.trim(),
-          contact: (bloodRequesterContact?.value || '').trim() || bloodContactPhone.value.trim(),
+          name: (bloodRequesterName?.value || '').trim() || (bloodRequesterRelation?.value === 'Self' ? bloodPatientName.value.trim() : (currentUser?.name || 'Citizen Requester')),
+          contact: (bloodRequesterContact?.value || '').trim() || (currentUser?.phone || currentUser?.email || bloodContactPhone.value.trim()),
           role: bloodRequesterRole?.value || 'USER',
           relationshipToPatient: bloodRequesterRelation?.value || 'Friend',
         },
@@ -3411,11 +3566,14 @@
         const patName = r.patient?.name || r.patientName || 'Patient';
         const patAge = r.patient?.age || r.patientAge;
         const patSex = r.patient?.gender || r.patientSex;
+        const patHosp = r.patient?.currentHospital || 'In-Transit / Clinic';
+        const patPhone = r.patient?.contactPhone || r.contactPhone || 'Private';
         const bGroup = r.bloodRequirement?.bloodGroup || r.bloodGroup || '';
         const bComp = r.bloodRequirement?.component || r.bloodComponent || 'Whole Blood';
         const bQty = r.bloodRequirement?.quantity || r.quantity || 1;
         const reqName = r.requester?.name || 'Citizen Requester';
         const reqRelation = r.requester?.relationshipToPatient || 'Friend';
+        const reqContact = r.requester?.contact || patPhone;
 
         const myRecipient = (r.recipients || []).find(rec => String(rec.hospital?._id || rec.hospital) === String(userHospId));
         const myStatus = myRecipient ? myRecipient.status : r.status;
@@ -3431,23 +3589,30 @@
         return `
           <div class="staff-blood-req-card ${isEmergency ? 'is-emergency' : ''}">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-              <div>
-                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <div style="flex: 1;">
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px;">
                   <span class="blood-urgency-badge ${escapeHtml(urgencyVal)}">
-                    ${isEmergency ? '🚨 ' : ''}${escapeHtml(urgencyVal)}
+                    ⚠️ Urgency: <strong>${escapeHtml(urgencyVal)}</strong>
                   </span>
                   <span style="font-family: monospace; font-weight: 700; color: #be123c; font-size: 0.85rem;">${escapeHtml(displayId)}</span>
                   <span class="status-badge" style="font-size: 0.75rem;">${escapeHtml(myStatus)}</span>
                 </div>
 
-                <h4 style="margin: 6px 0 2px; font-size: 1.05rem;">
-                  ${escapeHtml(patName)} · <strong style="color: #be123c;">${escapeHtml(bGroup)} (${escapeHtml(bComp)})</strong>
+                <h4 style="margin: 4px 0 2px; font-size: 1.12rem; color: #0f172a;">
+                  👤 Patient: <strong style="color: #be123c;">${escapeHtml(patName)}</strong>
+                  <span style="font-size: 0.82rem; font-weight: normal; color: var(--muted);">(${patAge ? patAge + 'y' : 'Age —'}${patSex ? ', ' + escapeHtml(patSex) : ''})</span>
                 </h4>
-                <div style="font-size: 0.82rem; color: var(--muted);">
-                  Required: <strong>${bQty} Units</strong> | Age: ${patAge || '—'} | Sex: ${patSex || '—'}
+
+                <div style="font-size: 0.9rem; margin-top: 2px;">
+                  🩸 Blood: <strong style="color: #be123c;">${escapeHtml(bGroup)} (${escapeHtml(bComp)})</strong> &nbsp;|&nbsp; 📦 Quantity: <strong>${bQty} Units</strong>
                 </div>
-                <div style="font-size: 0.8rem; color: var(--secondary); margin-top: 2px;">
-                  👤 <em>Requested by: ${escapeHtml(reqName)} (${escapeHtml(reqRelation)}) · 📞 ${escapeHtml(r.patient?.contactPhone || r.contactPhone || 'Private')}</em>
+
+                <div style="font-size: 0.84rem; color: var(--secondary); margin-top: 2px;">
+                  🏥 Hospital / Location: <strong>${escapeHtml(patHosp)}</strong>
+                </div>
+
+                <div style="font-size: 0.82rem; color: #1e40af; background: #eff6ff; padding: 4px 8px; border-radius: 4px; border: 1px solid #dbeafe; display: inline-block; margin-top: 4px;">
+                  📞 Requester: <strong>${escapeHtml(reqName)}</strong> (${escapeHtml(reqRelation)}) &middot; Contact: <strong>${escapeHtml(reqContact)}</strong>
                 </div>
               </div>
               <button type="button" class="btn btn-outline btn-xs view-blood-detail-btn" data-id="${r._id}">View Details</button>
@@ -3712,20 +3877,24 @@
 
       bloodDetailBody.innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-          <div class="admin-panel-card" style="background: #f8fafc;">
-            <h4 style="margin: 0 0 6px; font-size: 0.92rem; color: var(--secondary);">A. Patient Demographics</h4>
-            <p style="margin: 0 0 4px;"><strong>Name:</strong> ${escapeHtml(patName)} (${patAge}y, ${patSex})</p>
-            <p style="margin: 0 0 4px;"><strong>Patient Phone:</strong> ${escapeHtml(patContact)}</p>
-            <p style="margin: 0 0 4px;"><strong>Admitted At:</strong> ${escapeHtml(patHosp)}</p>
-            <p style="margin: 0;"><strong>Attending Doctor:</strong> ${escapeHtml(patDoc)}</p>
+          <div class="admin-panel-card" style="background: #f8fafc; border: 1px solid #cbd5e1;">
+            <h4 style="margin: 0 0 8px; font-size: 0.92rem; color: #991b1b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+              SECTION 1: PATIENT DETAILS
+            </h4>
+            <p style="margin: 0 0 5px;"><strong>Patient Name:</strong> <span style="font-size: 1.05rem; font-weight: 700; color: #0f172a;">${escapeHtml(patName)}</span></p>
+            <p style="margin: 0 0 5px;"><strong>Age / Gender:</strong> ${patAge || '—'} Years / ${escapeHtml(patSex || '—')}</p>
+            <p style="margin: 0 0 5px;"><strong>Attending Doctor / Hospital:</strong> ${escapeHtml(patDoc)} &middot; ${escapeHtml(patHosp)}</p>
+            <p style="margin: 0;"><strong>Patient Contact:</strong> ${escapeHtml(patContact)}</p>
           </div>
 
-          <div class="admin-panel-card" style="background: #eff6ff;">
-            <h4 style="margin: 0 0 6px; font-size: 0.92rem; color: #1e40af;">B. Requester Details</h4>
-            <p style="margin: 0 0 4px;"><strong>Requester:</strong> ${escapeHtml(reqName)}</p>
-            <p style="margin: 0 0 4px;"><strong>Relation:</strong> ${escapeHtml(reqRel)}</p>
-            <p style="margin: 0 0 4px;"><strong>Role:</strong> ${escapeHtml(reqRole)}</p>
-            <p style="margin: 0;"><strong>Contact Phone:</strong> ${escapeHtml(reqContact)}</p>
+          <div class="admin-panel-card" style="background: #eff6ff; border: 1px solid #bfdbfe;">
+            <h4 style="margin: 0 0 8px; font-size: 0.92rem; color: #1e40af; border-bottom: 1px solid #dbeafe; padding-bottom: 4px;">
+              SECTION 2: REQUESTER DETAILS
+            </h4>
+            <p style="margin: 0 0 5px;"><strong>Requester Name:</strong> <span style="font-size: 1.05rem; font-weight: 700; color: #1e40af;">${escapeHtml(reqName)}</span></p>
+            <p style="margin: 0 0 5px;"><strong>Relationship to Patient:</strong> <span class="status-badge" style="background: #dbeafe; color: #1e40af; font-size: 0.75rem;">${escapeHtml(reqRel)}</span></p>
+            <p style="margin: 0 0 5px;"><strong>Contact:</strong> ${escapeHtml(reqContact)}</p>
+            <p style="margin: 0;"><strong>Role:</strong> ${escapeHtml(reqRole)}</p>
           </div>
         </div>
 

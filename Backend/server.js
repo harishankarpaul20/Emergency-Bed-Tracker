@@ -176,6 +176,7 @@ app.use('/api/emergency', emergencyRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/blood-banks', bloodBankRoutes);
+app.use('/api/blood-bank', bloodBankRoutes);
 app.use('/api/blood-availability', bloodBankRoutes);
 app.use('/api/blood-inventory', bloodBankRoutes);
 app.use('/api/blood-requests', bloodRequestRoutes);
