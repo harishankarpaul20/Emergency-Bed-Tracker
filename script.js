@@ -2716,54 +2716,151 @@
   let cachedBloodRequests = [];
   let userGeoLocation = null;
 
-  // --- 1. VIEW ROUTING & NAVIGATION ---
-  function showBloodBankPortal(active = true) {
+  // --- 1. VIEW ROUTING & NAVIGATION (BLOOD BANK <-> MAIN HOMEPAGE) ---
+  function showBloodBankPortal(updateHistory = true) {
     if (!bloodBankPortal) return;
     const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
     
-    if (active) {
-      mainSections.forEach(s => (s.hidden = true));
-      bloodBankPortal.hidden = false;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      history.pushState(null, '', '#blood-bank');
-      
-      // Load stats and initial search
-      fetchBloodBankStatistics();
-      executeBloodSearch();
-    } else {
-      mainSections.forEach(s => (s.hidden = false));
-      bloodBankPortal.hidden = true;
-      history.pushState(null, '', '#main-content');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Hide all main homepage sections
+    mainSections.forEach(s => (s.hidden = true));
+    bloodBankPortal.hidden = false;
+
+    // Position at the very top of the portal
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    if (mobileMenu && mobileMenu.classList.contains('open')) {
+      mobileMenu.classList.remove('open');
+      if (hamburgerBtn) hamburgerBtn.setAttribute('aria-expanded', 'false');
     }
+
+    if (updateHistory && window.location.hash !== '#blood-bank') {
+      history.pushState({ view: 'blood-bank' }, '', '#blood-bank');
+    }
+
+    // Load stats and initial search
+    fetchBloodBankStatistics();
+    executeBloodSearch();
   }
 
+  function navigateToOriginalHome(updateHistory = true, targetSectionId = null) {
+    if (!bloodBankPortal) return;
+    const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
+    
+    // 1. Unhide all original homepage sections
+    mainSections.forEach(s => (s.hidden = false));
+
+    // 2. Hide Blood Bank Portal completely
+    bloodBankPortal.hidden = true;
+
+    // 3. Close mobile drawer menu if open
+    if (mobileMenu && mobileMenu.classList.contains('open')) {
+      mobileMenu.classList.remove('open');
+      if (hamburgerBtn) hamburgerBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    // 4. Handle specific target sections (Find Beds, Hospitals, Map, etc.)
+    if (targetSectionId && targetSectionId !== '#main-content' && targetSectionId !== '#home' && targetSectionId !== '#') {
+      const targetEl = document.querySelector(targetSectionId);
+      if (targetEl) {
+        if (updateHistory && window.location.hash !== targetSectionId) {
+          history.pushState({ view: 'home', section: targetSectionId }, '', targetSectionId);
+        }
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
+
+    // 5. Navigate to original Emergency Bed Tracker homepage at the top
+    if (updateHistory) {
+      // Clean path without hash (compatible with local & GitHub Pages subpaths)
+      const cleanUrl = window.location.pathname + window.location.search;
+      history.pushState({ view: 'home' }, '', cleanUrl);
+    }
+
+    // 6. Ensure the page starts at the very top of the original homepage
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+
+  // A) [ 🩸 Blood Bank ] button click handlers (Desktop, Mobile, Nav)
   [navBloodBankBtn, navBloodBankLink, mobileBloodBankBtn].forEach(btn => {
     if (btn) {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         showBloodBankPortal(true);
-        if (mobileMenu && mobileMenu.classList.contains('open')) {
-          mobileMenu.classList.remove('open');
-        }
       });
     }
   });
 
+  // B) [ 🏥 Back to Bed Tracker ] button inside Blood Bank Portal
   if (returnToBedTrackerBtn) {
-    returnToBedTrackerBtn.addEventListener('click', () => showBloodBankPortal(false));
+    returnToBedTrackerBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToOriginalHome(true);
+    });
   }
 
-  // Handle URL hash on load
-  if (window.location.hash === '#blood-bank') {
-    showBloodBankPortal(true);
-  }
-
-  window.addEventListener('hashchange', () => {
-    if (window.location.hash === '#blood-bank') {
-      showBloodBankPortal(true);
-    }
+  // C) Emergency Bed Tracker Logo click handler (Returns to Homepage at top)
+  document.querySelectorAll('.brand, #brandLogoLink').forEach(brand => {
+    brand.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToOriginalHome(true);
+    });
   });
+
+  // D) "Home" navigation links (Desktop, Mobile menu, Footer, and #main-content links)
+  document.querySelectorAll('#navHomeLink, #mobileHomeBtn, #footerHomeLink, a[href="#main-content"]').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToOriginalHome(true);
+    });
+  });
+
+  // E) Other Navbar links when inside Blood Bank Portal (#find-beds, #hospitals, etc.)
+  document.querySelectorAll('#navLinks a, #mobileMenu a, .footer-links a').forEach(link => {
+    const href = link.getAttribute('href');
+    if (!href || href === '#blood-bank' || href.startsWith('tel:') || href === '#staff-portal') return;
+
+    link.addEventListener('click', (e) => {
+      if (bloodBankPortal && !bloodBankPortal.hidden) {
+        e.preventDefault();
+        if (href === '#main-content' || href === '#home') {
+          navigateToOriginalHome(true);
+        } else {
+          navigateToOriginalHome(true, href);
+        }
+      }
+    });
+  });
+
+  // F) Browser Back & Forward button handling (popstate & hashchange)
+  function handleNavigationSync() {
+    const hash = window.location.hash;
+    if (hash === '#blood-bank') {
+      if (bloodBankPortal && bloodBankPortal.hidden) {
+        showBloodBankPortal(false); // don't push duplicate history entry
+      }
+    } else {
+      if (bloodBankPortal && !bloodBankPortal.hidden) {
+        navigateToOriginalHome(false, hash || null); // don't push duplicate history entry
+      }
+    }
+  }
+
+  window.addEventListener('popstate', handleNavigationSync);
+  window.addEventListener('hashchange', handleNavigationSync);
+
+  // G) Initial load route check
+  if (window.location.hash === '#blood-bank') {
+    showBloodBankPortal(false);
+  } else {
+    if (bloodBankPortal) bloodBankPortal.hidden = true;
+    const initialMainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
+    initialMainSections.forEach(s => (s.hidden = false));
+  }
 
   // --- 2. POPULATE DROPDOWNS & COMPATIBILITY HELPERS ---
   if (bloodSearchDistrict && bloodSearchDistrict.options.length <= 1) {
