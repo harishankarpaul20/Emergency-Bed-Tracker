@@ -42,10 +42,14 @@
       <a href="#map-section">Map</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
+      <a href="#blood-bank" id="navBloodBankLink">🩸 Blood Bank</a>
       <a href="#staff-portal" id="navStaffPortalBtn" class="nav-staff-link">🔐 Staff Portal</a>
     </nav>
 
     <div class="navbar-actions">
+      <a href="#blood-bank" class="btn btn-blood btn-sm" id="navBloodBankBtn" aria-label="Open Blood Bank Portal">
+        🩸 <span>Blood Bank</span>
+      </a>
       <a href="tel:112" class="btn btn-emergency btn-sm" aria-label="Call emergency number 112">
         🚨 <span>Emergency 112</span>
       </a>
@@ -58,6 +62,7 @@
   <div class="mobile-menu" id="mobileMenu">
     <a href="#main-content">Home</a>
     <a href="#find-beds">Find Beds</a>
+    <a href="#blood-bank" id="mobileBloodBankBtn" style="color: #e11d48; font-weight: 700;">🩸 Blood Bank Portal</a>
     <a href="#hospitals">Hospitals</a>
     <a href="#emergency-patient-intake">Patient Intake</a>
     <a href="#map-section">Map</a>
@@ -69,6 +74,241 @@
 </header>
 
 <main id="main-content">
+
+  <!-- ================= 2.5 BLOODCONNECT WEST BENGAL PORTAL ================= -->
+  <section class="blood-bank-portal" id="bloodBankPortal" hidden aria-labelledby="bloodPortalHeading">
+    <div class="blood-portal-hero">
+      <div class="blood-hero-inner">
+        <div class="blood-badge-tag">
+          <span>🩸</span> BloodConnect West Bengal · Integrated Emergency Blood Network
+        </div>
+        <h1 id="bloodPortalHeading">State-Wide Emergency Blood Availability &amp; Cross-Matching</h1>
+        <p class="blood-hero-sub">
+          Search real-time compatible blood supplies, dispatch multi-hospital emergency broadcast requests, and connect with volunteer donors across all 23 districts of West Bengal.
+        </p>
+
+        <!-- LIVE STATEWIDE BLOOD METRICS -->
+        <div class="blood-stats-grid" id="bloodPortalMetrics">
+          <div class="blood-stat-card">
+            <span class="blood-stat-icon">🩸</span>
+            <div class="blood-stat-info">
+              <span class="blood-stat-num" id="statTotalBloodUnits">14,000+</span>
+              <span class="blood-stat-lbl">Units Available Statewide</span>
+            </div>
+          </div>
+          <div class="blood-stat-card">
+            <span class="blood-stat-icon">🏥</span>
+            <div class="blood-stat-info">
+              <span class="blood-stat-num" id="statActiveBloodBanks">24 / 24</span>
+              <span class="blood-stat-lbl">Verified Blood Banks</span>
+            </div>
+          </div>
+          <div class="blood-stat-card">
+            <span class="blood-stat-icon">⚡</span>
+            <div class="blood-stat-info">
+              <span class="blood-stat-num" id="statBloodAlerts">Instant</span>
+              <span class="blood-stat-lbl">ABO/Rh Compatibility Match</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUICK ACTION BAR -->
+        <div class="blood-actions-row">
+          <button type="button" class="btn btn-blood btn-lg" id="openEmergencyBloodRequestBtn">
+            🚨 Dispatch Emergency Blood Request
+          </button>
+          <a href="#volunteer-donor-section" class="btn btn-outline-white" id="scrollToDonorFormBtn">
+            ❤️ Volunteer as Donor
+          </a>
+          <button type="button" class="btn btn-ghost-white" id="returnToBedTrackerBtn">
+            🏥 Back to Bed Tracker
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOOD SEARCH & COMPATIBILITY MODULE -->
+    <div class="section-inner" style="padding-top: 36px;">
+      <div class="blood-search-card">
+        <div class="blood-search-head">
+          <h2 style="font-size: 1.35rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>🔍</span> Find Blood Units by Compatibility &amp; District
+          </h2>
+          <p style="font-size: 0.85rem; color: var(--muted); margin: 4px 0 0;">
+            Select recipient blood group and component. Our system automatically evaluates ABO/Rh cross-match compatibility rules.
+          </p>
+        </div>
+
+        <form id="bloodSearchForm" class="blood-search-form" style="margin-top: 18px;">
+          <div class="blood-fields-grid">
+            <div class="form-group">
+              <label for="bloodSearchGroup" style="font-weight: 700; font-size: 0.84rem;">Recipient Blood Group</label>
+              <select id="bloodSearchGroup" class="form-control">
+                <option value="">All Groups (View All Facilities)</option>
+                <option value="A+">A+ (A Positive)</option>
+                <option value="A-">A- (A Negative)</option>
+                <option value="B+">B+ (B Positive)</option>
+                <option value="B-">B- (B Negative)</option>
+                <option value="AB+">AB+ (AB Positive - Universal Recipient)</option>
+                <option value="AB-">AB- (AB Negative)</option>
+                <option value="O+">O+ (O Positive)</option>
+                <option value="O-">O- (O Negative - Universal Donor)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="bloodSearchComponent" style="font-weight: 700; font-size: 0.84rem;">Blood Component</label>
+              <select id="bloodSearchComponent" class="form-control">
+                <option value="Whole Blood">Whole Blood</option>
+                <option value="Packed RBC">Packed RBC (Red Blood Cells)</option>
+                <option value="Platelets">Platelets (RDP / SDP)</option>
+                <option value="Plasma">Fresh Frozen Plasma (FFP)</option>
+                <option value="Cryoprecipitate">Cryoprecipitate</option>
+                <option value="all">All Components</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="bloodSearchDistrict" style="font-weight: 700; font-size: 0.84rem;">District (West Bengal)</label>
+              <select id="bloodSearchDistrict" class="form-control">
+                <option value="all">All Districts (Statewide)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="bloodSearchQuantity" style="font-weight: 700; font-size: 0.84rem;">Units Needed</label>
+              <input type="number" id="bloodSearchQuantity" class="form-control" min="1" max="20" value="1">
+            </div>
+          </div>
+
+          <!-- DYNAMIC ABO/Rh COMPATIBILITY BANNER -->
+          <div id="bloodCompatBanner" class="blood-compat-banner" hidden>
+            <span class="compat-icon">⚡</span>
+            <div class="compat-content">
+              <strong>ABO/Rh Compatibility Recommendation:</strong>
+              <span id="compatSummaryText"></span>
+            </div>
+          </div>
+
+          <div class="blood-search-actions">
+            <button type="submit" class="btn btn-blood" id="bloodSearchSubmitBtn">
+              🔍 Search Blood Availability
+            </button>
+            <button type="button" class="btn btn-outline" id="bloodNearMeBtn">
+              📍 Sort by Nearest to Me
+            </button>
+            <button type="button" class="btn btn-ghost" id="bloodResetSearchBtn">
+              Clear Filters
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- SEARCH RESULTS SECTION -->
+      <div id="bloodResultsSection" style="margin-top: 32px;">
+        <div class="blood-results-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 id="bloodResultsTitle" style="margin: 0; font-size: 1.25rem;">Participating Hospital Blood Banks</h3>
+            <p id="bloodResultsMeta" style="margin: 2px 0 0; font-size: 0.84rem; color: var(--muted);">Showing all verified blood banks in West Bengal</p>
+          </div>
+          <button type="button" class="btn btn-blood btn-sm" id="resultsEmergencyRequestBtn">
+            🚨 Request Blood from Multiple Hospitals
+          </button>
+        </div>
+
+        <div class="blood-grid" id="bloodResultsGrid" style="margin-top: 16px;">
+          <!-- Injected dynamically -->
+        </div>
+
+        <div class="empty-state" id="bloodEmptyState" hidden>
+          <span class="empty-icon">🩸</span>
+          <h3>No matching blood supplies found</h3>
+          <p>Try searching across all districts or checking compatible alternative blood groups.</p>
+          <button type="button" class="btn btn-outline" id="bloodEmptyResetBtn">VIEW ALL BLOOD BANKS</button>
+        </div>
+      </div>
+
+      <!-- VOLUNTEER DONOR REGISTRATION SECTION -->
+      <div class="donor-signup-section" id="volunteer-donor-section" style="margin-top: 48px;">
+        <div class="donor-card-banner">
+          <div class="donor-banner-text">
+            <span class="eyebrow" style="color: #fda4af;">Volunteer Donor Registry</span>
+            <h2 style="color: #fff; margin-bottom: 8px;">Become a Volunteer Blood Donor in West Bengal</h2>
+            <p style="color: #ffe4e6; margin-bottom: 0;">
+              In critical situations like rare blood group shortages or emergencies, hospitals urgently need voluntary donors. Register to be contacted when a compatible life is on the line.
+            </p>
+            <div class="privacy-guarantee" style="margin-top: 14px; font-size: 0.82rem; color: #fecdd3; display: flex; align-items: center; gap: 8px;">
+              <span>🔒</span> <strong>Donor Privacy Protected:</strong> Your phone number is strictly confidential and only visible to verified clinicians during active emergencies.
+            </div>
+          </div>
+
+          <form id="volunteerDonorForm" class="donor-form" style="background: #fff; padding: 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-md);">
+            <h3 style="margin-top: 0; font-size: 1.05rem; color: var(--secondary);">Register as Blood Donor</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 12px;">
+              <div class="form-group">
+                <label for="donorName" style="font-size: 0.82rem; font-weight: 600;">Full Name *</label>
+                <input type="text" id="donorName" required class="form-control" placeholder="Your full name">
+              </div>
+              <div class="form-group">
+                <label for="donorBloodGroup" style="font-size: 0.82rem; font-weight: 600;">Blood Group *</label>
+                <select id="donorBloodGroup" required class="form-control">
+                  <option value="">Select group...</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O- (Universal)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="donorAge" style="font-size: 0.82rem; font-weight: 600;">Age (18-65) *</label>
+                <input type="number" id="donorAge" required min="18" max="65" class="form-control" placeholder="Age in years">
+              </div>
+              <div class="form-group">
+                <label for="donorGender" style="font-size: 0.82rem; font-weight: 600;">Gender *</label>
+                <select id="donorGender" required class="form-control">
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="donorDistrict" style="font-size: 0.82rem; font-weight: 600;">District *</label>
+                <select id="donorDistrict" required class="form-control">
+                  <option value="">Select district...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="donorCity" style="font-size: 0.82rem; font-weight: 600;">City / Locality *</label>
+                <input type="text" id="donorCity" required class="form-control" placeholder="e.g. Salt Lake, Howrah">
+              </div>
+              <div class="form-group">
+                <label for="donorPhone" style="font-size: 0.82rem; font-weight: 600;">Contact Phone *</label>
+                <input type="tel" id="donorPhone" required class="form-control" placeholder="10-digit mobile number">
+              </div>
+              <div class="form-group">
+                <label for="donorEmail" style="font-size: 0.82rem; font-weight: 600;">Email (Optional)</label>
+                <input type="email" id="donorEmail" class="form-control" placeholder="donor@email.com">
+              </div>
+            </div>
+
+            <label class="checkbox-label" style="margin-top: 14px; font-size: 0.8rem; display: flex; align-items: flex-start; gap: 8px;">
+              <input type="checkbox" id="donorConsent" required style="margin-top: 3px;">
+              <span>I confirm I am in good health, meet blood donation guidelines, and consent to be contacted for emergency life-saving donations.</span>
+            </label>
+
+            <button type="submit" class="btn btn-blood btn-block" id="donorSubmitBtn" style="margin-top: 16px;">
+              ❤️ Register as Volunteer Donor
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
 
   <!-- ================= 3. HERO ================= -->
   <section class="hero" aria-labelledby="hero-heading">
@@ -1002,6 +1242,8 @@
       <div style="margin-top: 24px;">
         <div class="staff-portal-tabs" style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 14px; flex-wrap: wrap;">
           <button type="button" class="staff-tab-btn active" id="tabBtnRequests" style="padding: 8px 14px; border: none; background: transparent; font-weight: 700; font-size: 0.88rem; cursor: pointer; border-bottom: 3px solid var(--primary); margin-bottom: -2px; color: var(--primary);">📋 Bed Requests</button>
+          <button type="button" class="staff-tab-btn" id="tabBtnBloodRequests" style="padding: 8px 14px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted); margin-bottom: -2px;">🩸 Blood Requests</button>
+          <button type="button" class="staff-tab-btn" id="tabBtnBloodInventory" style="padding: 8px 14px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted); margin-bottom: -2px;">🧪 Blood Stock</button>
           <button type="button" class="staff-tab-btn" id="tabBtnIncomingRef" style="padding: 8px 14px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted); margin-bottom: -2px;">📥 My Referrals (Incoming)</button>
           <button type="button" class="staff-tab-btn" id="tabBtnOutgoingRef" style="padding: 8px 14px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted); margin-bottom: -2px;">📤 Sent Referrals (Outgoing)</button>
         </div>
@@ -1027,6 +1269,34 @@
           </div>
           <div id="incomingReferralsContainer">
             <p style="color: var(--muted); font-size: 0.88rem;">No incoming patient referrals.</p>
+          </div>
+        </div>
+
+        
+        <!-- 4. PANE: BLOOD REQUESTS -->
+        <div id="tabPaneBloodRequests" hidden>
+          <div class="blood-filter-bar" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+            <button type="button" class="chip active blood-filter-chip" data-status="all">All</button>
+            <button type="button" class="chip blood-filter-chip" data-status="PENDING">Pending</button>
+            <button type="button" class="chip blood-filter-chip" data-status="BLOOD_RESERVED">Reserved</button>
+            <button type="button" class="chip blood-filter-chip" data-status="PARTIALLY_ACCEPTED">Partially Accepted</button>
+            <button type="button" class="chip blood-filter-chip" data-status="COMPLETED">Completed</button>
+            <button type="button" class="chip blood-filter-chip" data-status="REJECTED">Rejected</button>
+            <button type="button" class="chip blood-filter-chip" data-status="CANCELLED">Cancelled</button>
+          </div>
+          <div id="staffBloodRequestsContainer" style="margin-top: 8px;">
+            <p style="color: var(--muted); font-size: 0.88rem;">No blood requests currently pending for this hospital.</p>
+          </div>
+        </div>
+
+        <!-- 5. PANE: BLOOD INVENTORY -->
+        <div id="tabPaneBloodInventory" hidden>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div id="bloodInvSummaryBadges" style="display: flex; gap: 8px; font-size: 0.82rem;"></div>
+            <button type="button" class="btn btn-blood btn-xs" id="openAddBloodStockBtn">➕ Update Blood Stock</button>
+          </div>
+          <div id="staffBloodInventoryContainer" style="overflow-x: auto; max-height: 400px;">
+            <p style="color: var(--muted); font-size: 0.88rem;">Loading blood inventory...</p>
           </div>
         </div>
 
@@ -1144,6 +1414,7 @@
           <div class="form-group">
             <label style="font-weight: 600; font-size: 0.82rem; margin-bottom: 6px; display: block;">Special Requirements (Multi-select)</label>
             <div id="refSpecialReqGrid" class="spec-req-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
+              <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Blood Support" id="refReqBlood"> 🩸 Blood Support</label>
               <label class="checkbox-label"><input type="checkbox" name="specialReq" value="ICU"> ICU</label>
               <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Oxygen"> Oxygen</label>
               <label class="checkbox-label"><input type="checkbox" name="specialReq" value="Ventilator"> Ventilator</label>
@@ -1261,6 +1532,253 @@
     </div>
   </div>
 </div>
+
+<!-- ================= MULTI-HOSPITAL EMERGENCY BLOOD REQUEST MODAL ================= -->
+<div class="modal-overlay" id="bloodRequestModalOverlay" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="bloodReqModalTitle" style="max-height: 90vh; overflow-y: auto;">
+    <button class="modal-close" id="bloodReqModalCloseBtn" aria-label="Close blood request form">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="bloodReqModalTitle" style="margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+          <span>🩸</span> Emergency Blood Request &amp; Multi-Hospital Broadcast
+        </h2>
+        <p class="eyebrow" style="margin: 2px 0 0;">State-Wide Emergency Blood Network</p>
+      </div>
+      <span class="status-badge" style="background: #ffe4e6; color: #be123c; border-color: #fecdd3;">⚡ Simultaneous Multi-Hospital Dispatch</span>
+    </div>
+
+    <form id="createBloodRequestForm" class="portal-form" style="margin-top: 14px;">
+      <!-- STEP 1: PATIENT DEMOGRAPHICS -->
+      <div class="admin-panel-card" style="background: #f8fafc; border-color: #cbd5e1; margin-bottom: 14px;">
+        <h4 style="margin: 0 0 10px; font-size: 0.92rem; color: var(--secondary);">1. Patient Demographics &amp; Location</h4>
+        <div class="ref-identity-grid">
+          <div class="form-group ref-full-width">
+            <label for="bloodPatientName">Patient Full Name *</label>
+            <input type="text" id="bloodPatientName" required class="form-control" placeholder="Enter patient's full name">
+          </div>
+          <div class="form-group">
+            <label for="bloodPatientAge">Age (Years) *</label>
+            <input type="number" id="bloodPatientAge" required min="0" max="120" value="35" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="bloodPatientSex">Sex / Gender *</label>
+            <select id="bloodPatientSex" required class="form-control">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bloodContactPhone">Emergency Contact Phone *</label>
+            <input type="tel" id="bloodContactPhone" required class="form-control" placeholder="10-digit mobile (e.g. 98300 12345)">
+          </div>
+          <div class="form-group">
+            <label for="bloodAdmittedHospital">Current Admitting Hospital / Bed Location</label>
+            <input type="text" id="bloodAdmittedHospital" class="form-control" placeholder="Hospital or home location">
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: CLINICAL BLOOD REQUIREMENT -->
+      <div class="admin-panel-card" style="margin-bottom: 14px;">
+        <h4 style="margin: 0 0 10px; font-size: 0.92rem; color: var(--secondary);">2. Clinical Blood Requirement &amp; Urgency</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+          <div class="form-group">
+            <label for="bloodReqGroup">Required Blood Group *</label>
+            <select id="bloodReqGroup" required class="form-control">
+              <option value="A+">A+ (A Positive)</option>
+              <option value="A-">A- (A Negative)</option>
+              <option value="B+">B+ (B Positive)</option>
+              <option value="B-">B- (B Negative)</option>
+              <option value="AB+">AB+ (AB Positive)</option>
+              <option value="AB-">AB- (AB Negative)</option>
+              <option value="O+">O+ (O Positive)</option>
+              <option value="O-">O- (O Negative)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bloodReqComponent">Component Required *</label>
+            <select id="bloodReqComponent" required class="form-control">
+              <option value="Whole Blood">Whole Blood</option>
+              <option value="Packed RBC">Packed RBC (Red Blood Cells)</option>
+              <option value="Platelets">Platelets (RDP / SDP)</option>
+              <option value="Plasma">Fresh Frozen Plasma (FFP)</option>
+              <option value="Cryoprecipitate">Cryoprecipitate</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bloodReqQuantity">Units Required (1 - 20) *</label>
+            <input type="number" id="bloodReqQuantity" required min="1" max="20" value="2" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="bloodReqUrgency">Clinical Urgency *</label>
+            <select id="bloodReqUrgency" required class="form-control">
+              <option value="Emergency" selected>🚨 Critical Emergency (Immediate Life-Threatening)</option>
+              <option value="Urgent">⚠️ Urgent (Within 2-4 Hours)</option>
+              <option value="Standard">Standard / Planned Procedure</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label for="bloodReqNotes">Clinical Indication / Diagnosis / Doctor's Notes *</label>
+          <textarea id="bloodReqNotes" rows="2" required class="form-control" placeholder="e.g. Major postpartum hemorrhage, severe polytrauma with active arterial bleeding, sickle cell crisis..."></textarea>
+        </div>
+      </div>
+
+      <!-- STEP 3: MULTI-HOSPITAL RECIPIENT SELECTION -->
+      <div class="admin-panel-card" style="margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h4 style="margin: 0; font-size: 0.92rem; color: var(--secondary);">3. Target Hospital Blood Banks (Multi-Select)</h4>
+            <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--muted);">Broadcast this emergency request simultaneously to multiple hospital blood banks.</p>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn btn-outline btn-xs" id="selectAllHospitalsInDistrictBtn">Select All in District</button>
+            <button type="button" class="btn btn-ghost btn-xs" id="clearAllHospitalsBtn">Clear All</button>
+          </div>
+        </div>
+
+        <div id="targetHospitalChecklist" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: #fff;">
+          <!-- Checkbox items injected dynamically with compatible stock counts -->
+        </div>
+        <div id="targetHospCountSummary" style="font-size: 0.8rem; color: var(--primary); font-weight: 600; margin-top: 6px;">
+          Selected: 0 blood bank(s)
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-ghost" id="bloodReqCancelBtn">CANCEL</button>
+        <button type="submit" class="btn btn-blood" id="bloodReqSubmitBtn">🚀 DISPATCH BLOOD REQUEST</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= BLOOD REQUEST CLINICAL DETAILS MODAL ================= -->
+<div class="modal-overlay" id="bloodRequestDetailModalOverlay" hidden>
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="bloodDetailModalTitle" style="max-height: 90vh; overflow-y: auto;">
+    <button class="modal-close" id="bloodDetailModalCloseBtn" aria-label="Close details">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="bloodDetailModalTitle" style="margin: 0; font-size: 1.25rem;">Blood Request Clinical Details</h2>
+        <p class="eyebrow" id="bloodDetailSubtitle" style="margin: 2px 0 0;">ID: ...</p>
+      </div>
+      <span class="status-badge" id="bloodDetailStatusBadge">PENDING</span>
+    </div>
+
+    <div id="bloodDetailBody" style="margin-top: 14px; font-size: 0.88rem;">
+      <!-- Populated dynamically -->
+    </div>
+
+    <div class="modal-footer" id="bloodDetailActions" style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+      <!-- Buttons injected based on clinician role & request status -->
+    </div>
+  </div>
+</div>
+
+<!-- ================= PARTIAL ACCEPTANCE PROMPT MODAL ================= -->
+<div class="modal-overlay" id="bloodPartialAcceptModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="max-width: 440px;">
+    <h3>Partial Stock Acceptance</h3>
+    <p style="font-size: 0.82rem; color: var(--muted);">Specify how many units your blood bank can immediately fulfill and reserve.</p>
+    <div class="form-group" style="margin-top: 12px;">
+      <label for="partialUnitsInput" style="font-weight: 600; font-size: 0.82rem;">Available Units to Reserve *</label>
+      <input type="number" id="partialUnitsInput" min="1" value="1" required class="form-control">
+    </div>
+    <div class="form-group" style="margin-top: 10px;">
+      <label for="partialNotesInput" style="font-weight: 600; font-size: 0.82rem;">Notes for Attending Physician</label>
+      <textarea id="partialNotesInput" rows="2" class="form-control" placeholder="e.g. 2 units ready now, replacement donor required for balance..."></textarea>
+    </div>
+    <div class="modal-footer" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button type="button" class="btn btn-ghost" id="partialCancelBtn">CANCEL</button>
+      <button type="button" class="btn btn-primary" id="partialConfirmBtn">CONFIRM PARTIAL ACCEPTANCE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BLOOD REQUEST REJECTION MODAL ================= -->
+<div class="modal-overlay" id="bloodRejectModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="max-width: 440px;">
+    <h3>Reject Blood Request</h3>
+    <p style="font-size: 0.82rem; color: var(--muted);">A mandatory clinical or operational reason is required for rejection.</p>
+    <div class="form-group" style="margin-top: 12px;">
+      <label for="bloodRejectReasonInput" style="font-weight: 600; font-size: 0.82rem;">Reason for Rejection *</label>
+      <textarea id="bloodRejectReasonInput" required rows="3" class="form-control" placeholder="e.g. Zero matching stock in blood bank, refrigerator undergoing decontamination..."></textarea>
+    </div>
+    <div class="modal-footer" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button type="button" class="btn btn-ghost" id="bloodRejectCancelBtn">CANCEL</button>
+      <button type="button" class="btn btn-danger" id="bloodRejectConfirmBtn">CONFIRM REJECTION</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EMERGENCY DONOR BROADCAST MODAL ================= -->
+<div class="modal-overlay" id="bloodDonorBroadcastModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="max-width: 480px;">
+    <h3>📢 Emergency Donor Broadcast</h3>
+    <p style="font-size: 0.82rem; color: var(--muted);">Alert matching volunteer blood donors in this district for critical shortages.</p>
+    <div id="donorBroadcastInfo" style="padding: 10px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; font-size: 0.84rem; margin: 12px 0;">
+      <!-- Injected -->
+    </div>
+    <div class="form-group">
+      <label for="broadcastContactDetails" style="font-weight: 600; font-size: 0.82rem;">Hospital Emergency Blood Desk Phone *</label>
+      <input type="text" id="broadcastContactDetails" required class="form-control" placeholder="Contact number for donors to call">
+    </div>
+    <div class="modal-footer" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button type="button" class="btn btn-ghost" id="donorBroadcastCancelBtn">CANCEL</button>
+      <button type="button" class="btn btn-blood" id="donorBroadcastConfirmBtn">BROADCAST EMERGENCY ALERT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BLOOD INVENTORY UPDATE MODAL ================= -->
+<div class="modal-overlay" id="updateStockModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="max-width: 460px;">
+    <button class="modal-close" id="updateStockCloseBtn">✕</button>
+    <h3>Update Blood Bank Inventory</h3>
+    <p style="font-size: 0.82rem; color: var(--muted);">Adjust stock units and thresholds for this facility.</p>
+    <form id="updateStockForm" style="margin-top: 12px;">
+      <div class="form-group">
+        <label for="invBloodGroup">Blood Group *</label>
+        <select id="invBloodGroup" required class="form-control">
+          <option value="A+">A+</option>
+          <option value="A-">A-</option>
+          <option value="B+">B+</option>
+          <option value="B-">B-</option>
+          <option value="AB+">AB+</option>
+          <option value="AB-">AB-</option>
+          <option value="O+">O+</option>
+          <option value="O-">O-</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="invComponent">Component *</label>
+        <select id="invComponent" required class="form-control">
+          <option value="Whole Blood">Whole Blood</option>
+          <option value="Packed RBC">Packed RBC</option>
+          <option value="Platelets">Platelets</option>
+          <option value="Plasma">Plasma</option>
+          <option value="Cryoprecipitate">Cryoprecipitate</option>
+        </select>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div class="form-group">
+          <label for="invTotalUnits">Total Units *</label>
+          <input type="number" id="invTotalUnits" required min="0" max="200" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="invMinThreshold">Low Stock Alert Level</label>
+          <input type="number" id="invMinThreshold" value="5" min="1" max="50" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer" style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-ghost" id="updateStockCancelBtn">CANCEL</button>
+        <button type="submit" class="btn btn-primary" id="updateStockSubmitBtn">SAVE INVENTORY</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- Socket.IO & Leaflet Scripts -->

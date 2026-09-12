@@ -1893,10 +1893,13 @@
   const moreInfoConfirmBtn = document.getElementById('moreInfoConfirmBtn');
 
   // 1. Tab switching
+  const tabBtnBloodRequests = document.getElementById('tabBtnBloodRequests');
+  const tabBtnBloodInventory = document.getElementById('tabBtnBloodInventory');
+  const tabPaneBloodRequests = document.getElementById('tabPaneBloodRequests');
+  const tabPaneBloodInventory = document.getElementById('tabPaneBloodInventory');
+
   function switchStaffTab(tabName) {
-    if (!tabPaneRequests || !tabPaneIncomingRef || !tabPaneOutgoingRef) return;
-    
-    [tabBtnRequests, tabBtnIncomingRef, tabBtnOutgoingRef].forEach(b => {
+    [tabBtnRequests, tabBtnBloodRequests, tabBtnBloodInventory, tabBtnIncomingRef, tabBtnOutgoingRef].forEach(b => {
       if (b) {
         b.classList.remove('active');
         b.style.color = 'var(--muted)';
@@ -1905,34 +1908,62 @@
       }
     });
 
-    tabPaneRequests.hidden = true;
-    tabPaneIncomingRef.hidden = true;
-    tabPaneOutgoingRef.hidden = true;
+    if (tabPaneRequests) tabPaneRequests.hidden = true;
+    if (tabPaneBloodRequests) tabPaneBloodRequests.hidden = true;
+    if (tabPaneBloodInventory) tabPaneBloodInventory.hidden = true;
+    if (tabPaneIncomingRef) tabPaneIncomingRef.hidden = true;
+    if (tabPaneOutgoingRef) tabPaneOutgoingRef.hidden = true;
 
     if (tabName === 'requests') {
-      tabBtnRequests.classList.add('active');
-      tabBtnRequests.style.color = 'var(--primary)';
-      tabBtnRequests.style.borderBottom = '3px solid var(--primary)';
-      tabBtnRequests.style.fontWeight = '700';
-      tabPaneRequests.hidden = false;
+      if (tabBtnRequests) {
+        tabBtnRequests.classList.add('active');
+        tabBtnRequests.style.color = 'var(--primary)';
+        tabBtnRequests.style.borderBottom = '3px solid var(--primary)';
+        tabBtnRequests.style.fontWeight = '700';
+      }
+      if (tabPaneRequests) tabPaneRequests.hidden = false;
+    } else if (tabName === 'blood-requests') {
+      if (tabBtnBloodRequests) {
+        tabBtnBloodRequests.classList.add('active');
+        tabBtnBloodRequests.style.color = '#be123c';
+        tabBtnBloodRequests.style.borderBottom = '3px solid #be123c';
+        tabBtnBloodRequests.style.fontWeight = '700';
+      }
+      if (tabPaneBloodRequests) tabPaneBloodRequests.hidden = false;
+      loadStaffBloodRequests();
+    } else if (tabName === 'blood-inventory') {
+      if (tabBtnBloodInventory) {
+        tabBtnBloodInventory.classList.add('active');
+        tabBtnBloodInventory.style.color = '#be123c';
+        tabBtnBloodInventory.style.borderBottom = '3px solid #be123c';
+        tabBtnBloodInventory.style.fontWeight = '700';
+      }
+      if (tabPaneBloodInventory) tabPaneBloodInventory.hidden = false;
+      loadStaffBloodInventory();
     } else if (tabName === 'incoming') {
-      tabBtnIncomingRef.classList.add('active');
-      tabBtnIncomingRef.style.color = 'var(--primary)';
-      tabBtnIncomingRef.style.borderBottom = '3px solid var(--primary)';
-      tabBtnIncomingRef.style.fontWeight = '700';
-      tabPaneIncomingRef.hidden = false;
+      if (tabBtnIncomingRef) {
+        tabBtnIncomingRef.classList.add('active');
+        tabBtnIncomingRef.style.color = 'var(--primary)';
+        tabBtnIncomingRef.style.borderBottom = '3px solid var(--primary)';
+        tabBtnIncomingRef.style.fontWeight = '700';
+      }
+      if (tabPaneIncomingRef) tabPaneIncomingRef.hidden = false;
       loadIncomingReferrals();
     } else if (tabName === 'outgoing') {
-      tabBtnOutgoingRef.classList.add('active');
-      tabBtnOutgoingRef.style.color = 'var(--primary)';
-      tabBtnOutgoingRef.style.borderBottom = '3px solid var(--primary)';
-      tabBtnOutgoingRef.style.fontWeight = '700';
-      tabPaneOutgoingRef.hidden = false;
+      if (tabBtnOutgoingRef) {
+        tabBtnOutgoingRef.classList.add('active');
+        tabBtnOutgoingRef.style.color = 'var(--primary)';
+        tabBtnOutgoingRef.style.borderBottom = '3px solid var(--primary)';
+        tabBtnOutgoingRef.style.fontWeight = '700';
+      }
+      if (tabPaneOutgoingRef) tabPaneOutgoingRef.hidden = false;
       loadOutgoingReferrals();
     }
   }
 
   if (tabBtnRequests) tabBtnRequests.addEventListener('click', () => switchStaffTab('requests'));
+  if (tabBtnBloodRequests) tabBtnBloodRequests.addEventListener('click', () => switchStaffTab('blood-requests'));
+  if (tabBtnBloodInventory) tabBtnBloodInventory.addEventListener('click', () => switchStaffTab('blood-inventory'));
   if (tabBtnIncomingRef) tabBtnIncomingRef.addEventListener('click', () => switchStaffTab('incoming'));
   if (tabBtnOutgoingRef) tabBtnOutgoingRef.addEventListener('click', () => switchStaffTab('outgoing'));
 
@@ -2572,6 +2603,1048 @@
       socket.on('referral:status_change', () => {
         loadIncomingReferrals();
         loadOutgoingReferrals();
+      });
+    } catch (e) {}
+  }
+
+
+  /* =====================================================
+     15. BLOODCONNECT WEST BENGAL MODULE
+     Integrated Real-Time Blood Availability, Cross-Matching,
+     Multi-Hospital Requests, Donor Registry & Staff Management
+     ===================================================== */
+  
+  // Blood compatibility rule matrix
+  const BLOOD_COMPATIBILITY_RULES = {
+    'A+': ['A+', 'A-', 'O+', 'O-'],
+    'A-': ['A-', 'O-'],
+    'B+': ['B+', 'B-', 'O+', 'O-'],
+    'B-': ['B-', 'O-'],
+    'AB+': ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+    'AB-': ['AB-', 'A-', 'B-', 'O-'],
+    'O+': ['O+', 'O-'],
+    'O-': ['O-'],
+  };
+
+  const bloodBankPortal = document.getElementById('bloodBankPortal');
+  const navBloodBankBtn = document.getElementById('navBloodBankBtn');
+  const navBloodBankLink = document.getElementById('navBloodBankLink');
+  const mobileBloodBankBtn = document.getElementById('mobileBloodBankBtn');
+  const returnToBedTrackerBtn = document.getElementById('returnToBedTrackerBtn');
+
+  const bloodSearchForm = document.getElementById('bloodSearchForm');
+  const bloodSearchGroup = document.getElementById('bloodSearchGroup');
+  const bloodSearchComponent = document.getElementById('bloodSearchComponent');
+  const bloodSearchDistrict = document.getElementById('bloodSearchDistrict');
+  const bloodSearchQuantity = document.getElementById('bloodSearchQuantity');
+  const bloodCompatBanner = document.getElementById('bloodCompatBanner');
+  const compatSummaryText = document.getElementById('compatSummaryText');
+  const bloodResultsGrid = document.getElementById('bloodResultsGrid');
+  const bloodEmptyState = document.getElementById('bloodEmptyState');
+  const bloodResultsMeta = document.getElementById('bloodResultsMeta');
+  const bloodNearMeBtn = document.getElementById('bloodNearMeBtn');
+  const bloodResetSearchBtn = document.getElementById('bloodResetSearchBtn');
+  const bloodEmptyResetBtn = document.getElementById('bloodEmptyResetBtn');
+
+  // Blood Request Modal Elements
+  const bloodRequestModalOverlay = document.getElementById('bloodRequestModalOverlay');
+  const bloodReqModalCloseBtn = document.getElementById('bloodReqModalCloseBtn');
+  const bloodReqCancelBtn = document.getElementById('bloodReqCancelBtn');
+  const createBloodRequestForm = document.getElementById('createBloodRequestForm');
+  const openEmergencyBloodRequestBtn = document.getElementById('openEmergencyBloodRequestBtn');
+  const resultsEmergencyRequestBtn = document.getElementById('resultsEmergencyRequestBtn');
+  const targetHospitalChecklist = document.getElementById('targetHospitalChecklist');
+  const targetHospCountSummary = document.getElementById('targetHospCountSummary');
+  const selectAllHospitalsInDistrictBtn = document.getElementById('selectAllHospitalsInDistrictBtn');
+  const clearAllHospitalsBtn = document.getElementById('clearAllHospitalsBtn');
+
+  const bloodPatientName = document.getElementById('bloodPatientName');
+  const bloodPatientAge = document.getElementById('bloodPatientAge');
+  const bloodPatientSex = document.getElementById('bloodPatientSex');
+  const bloodContactPhone = document.getElementById('bloodContactPhone');
+  const bloodAdmittedHospital = document.getElementById('bloodAdmittedHospital');
+  const bloodReqGroup = document.getElementById('bloodReqGroup');
+  const bloodReqComponent = document.getElementById('bloodReqComponent');
+  const bloodReqQuantity = document.getElementById('bloodReqQuantity');
+  const bloodReqUrgency = document.getElementById('bloodReqUrgency');
+  const bloodReqNotes = document.getElementById('bloodReqNotes');
+  const bloodReqSubmitBtn = document.getElementById('bloodReqSubmitBtn');
+
+  // Clinical Detail Modal Elements
+  const bloodRequestDetailModalOverlay = document.getElementById('bloodRequestDetailModalOverlay');
+  const bloodDetailModalCloseBtn = document.getElementById('bloodDetailModalCloseBtn');
+  const bloodDetailTitle = document.getElementById('bloodDetailTitle');
+  const bloodDetailSubtitle = document.getElementById('bloodDetailSubtitle');
+  const bloodDetailStatusBadge = document.getElementById('bloodDetailStatusBadge');
+  const bloodDetailBody = document.getElementById('bloodDetailBody');
+  const bloodDetailActions = document.getElementById('bloodDetailActions');
+
+  // Prompts & Modals
+  const bloodPartialAcceptModalOverlay = document.getElementById('bloodPartialAcceptModalOverlay');
+  const partialUnitsInput = document.getElementById('partialUnitsInput');
+  const partialNotesInput = document.getElementById('partialNotesInput');
+  const partialCancelBtn = document.getElementById('partialCancelBtn');
+  const partialConfirmBtn = document.getElementById('partialConfirmBtn');
+
+  const bloodRejectModalOverlay = document.getElementById('bloodRejectModalOverlay');
+  const bloodRejectReasonInput = document.getElementById('bloodRejectReasonInput');
+  const bloodRejectCancelBtn = document.getElementById('bloodRejectCancelBtn');
+  const bloodRejectConfirmBtn = document.getElementById('bloodRejectConfirmBtn');
+
+  const bloodDonorBroadcastModalOverlay = document.getElementById('bloodDonorBroadcastModalOverlay');
+  const donorBroadcastInfo = document.getElementById('donorBroadcastInfo');
+  const broadcastContactDetails = document.getElementById('broadcastContactDetails');
+  const donorBroadcastCancelBtn = document.getElementById('donorBroadcastCancelBtn');
+  const donorBroadcastConfirmBtn = document.getElementById('donorBroadcastConfirmBtn');
+
+  const updateStockModalOverlay = document.getElementById('updateStockModalOverlay');
+  const updateStockCloseBtn = document.getElementById('updateStockCloseBtn');
+  const updateStockCancelBtn = document.getElementById('updateStockCancelBtn');
+  const updateStockForm = document.getElementById('updateStockForm');
+  const openAddBloodStockBtn = document.getElementById('openAddBloodStockBtn');
+  const invBloodGroup = document.getElementById('invBloodGroup');
+  const invComponent = document.getElementById('invComponent');
+  const invTotalUnits = document.getElementById('invTotalUnits');
+  const invMinThreshold = document.getElementById('invMinThreshold');
+
+  // Donor form
+  const volunteerDonorForm = document.getElementById('volunteerDonorForm');
+  const donorDistrict = document.getElementById('donorDistrict');
+  const donorSubmitBtn = document.getElementById('donorSubmitBtn');
+
+  let activeBloodRequestIdForAction = null;
+  let cachedBloodRequests = [];
+  let userGeoLocation = null;
+
+  // --- 1. VIEW ROUTING & NAVIGATION ---
+  function showBloodBankPortal(active = true) {
+    if (!bloodBankPortal) return;
+    const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
+    
+    if (active) {
+      mainSections.forEach(s => (s.hidden = true));
+      bloodBankPortal.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      history.pushState(null, '', '#blood-bank');
+      
+      // Load stats and initial search
+      fetchBloodBankStatistics();
+      executeBloodSearch();
+    } else {
+      mainSections.forEach(s => (s.hidden = false));
+      bloodBankPortal.hidden = true;
+      history.pushState(null, '', '#main-content');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  [navBloodBankBtn, navBloodBankLink, mobileBloodBankBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showBloodBankPortal(true);
+        if (mobileMenu && mobileMenu.classList.contains('open')) {
+          mobileMenu.classList.remove('open');
+        }
+      });
+    }
+  });
+
+  if (returnToBedTrackerBtn) {
+    returnToBedTrackerBtn.addEventListener('click', () => showBloodBankPortal(false));
+  }
+
+  // Handle URL hash on load
+  if (window.location.hash === '#blood-bank') {
+    showBloodBankPortal(true);
+  }
+
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash === '#blood-bank') {
+      showBloodBankPortal(true);
+    }
+  });
+
+  // --- 2. POPULATE DROPDOWNS & COMPATIBILITY HELPERS ---
+  if (bloodSearchDistrict && bloodSearchDistrict.options.length <= 1) {
+    DISTRICTS.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      bloodSearchDistrict.appendChild(opt);
+    });
+  }
+
+  if (donorDistrict && donorDistrict.options.length <= 1) {
+    DISTRICTS.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      donorDistrict.appendChild(opt);
+    });
+  }
+
+  if (bloodSearchGroup) {
+    bloodSearchGroup.addEventListener('change', updateCompatibilityBanner);
+  }
+
+  function updateCompatibilityBanner() {
+    const grp = bloodSearchGroup ? bloodSearchGroup.value : '';
+    if (!grp) {
+      if (bloodCompatBanner) bloodCompatBanner.hidden = true;
+      return;
+    }
+
+    const comp = bloodSearchComponent ? bloodSearchComponent.value : 'Whole Blood';
+    const compatible = BLOOD_COMPATIBILITY_RULES[grp] || [grp];
+    
+    if (bloodCompatBanner && compatSummaryText) {
+      bloodCompatBanner.hidden = false;
+      compatSummaryText.textContent = `A patient with blood group ${grp} can safely receive ${comp} from compatible donor groups: ${compatible.join(', ')}.`;
+    }
+  }
+
+  // --- 3. FETCH BLOOD METRICS ---
+  async function fetchBloodBankStatistics() {
+    try {
+      const res = await apiRequest('/blood-banks/statistics');
+      if (res && res.data) {
+        const d = res.data;
+        const statTotal = document.getElementById('statTotalBloodUnits');
+        const statActive = document.getElementById('statActiveBloodBanks');
+        if (statTotal && d.totalBloodUnitsAvailable !== undefined) {
+          statTotal.textContent = d.totalBloodUnitsAvailable.toLocaleString();
+        }
+        if (statActive && d.totalHospitalsInNetwork !== undefined) {
+          statActive.textContent = `${d.totalHospitalsInNetwork} / 24`;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch live blood statistics:', e.message);
+    }
+  }
+
+  // --- 4. PUBLIC BLOOD SEARCH ---
+  async function executeBloodSearch() {
+    if (!bloodResultsGrid) return;
+    bloodResultsGrid.innerHTML = '<p style="color: var(--muted); grid-column: 1/-1; text-align: center; padding: 24px;">🔄 Querying West Bengal blood banks...</p>';
+
+    const params = new URLSearchParams();
+    if (bloodSearchGroup && bloodSearchGroup.value) params.append('bloodGroup', bloodSearchGroup.value);
+    if (bloodSearchComponent && bloodSearchComponent.value && bloodSearchComponent.value !== 'all') {
+      params.append('component', bloodSearchComponent.value);
+    }
+    if (bloodSearchDistrict && bloodSearchDistrict.value && bloodSearchDistrict.value !== 'all') {
+      params.append('district', bloodSearchDistrict.value);
+    }
+    if (bloodSearchQuantity && bloodSearchQuantity.value) {
+      params.append('quantity', bloodSearchQuantity.value);
+    }
+    if (userGeoLocation) {
+      params.append('latitude', userGeoLocation.latitude);
+      params.append('longitude', userGeoLocation.longitude);
+    }
+
+    try {
+      const res = await apiRequest('/blood-banks/search?' + params.toString());
+      const facilities = res.data || [];
+
+      if (!facilities.length) {
+        bloodResultsGrid.innerHTML = '';
+        if (bloodEmptyState) bloodEmptyState.hidden = false;
+        if (bloodResultsMeta) bloodResultsMeta.textContent = '0 blood banks found matching search criteria.';
+        return;
+      }
+
+      if (bloodEmptyState) bloodEmptyState.hidden = true;
+      if (bloodResultsMeta) {
+        bloodResultsMeta.textContent = `Showing ${facilities.length} verified blood banks across West Bengal`;
+      }
+
+      bloodResultsGrid.innerHTML = facilities.map(f => {
+        const exactUnits = f.exactMatchAvailable || 0;
+        let statusBadge = '';
+        if (exactUnits >= 5) {
+          statusBadge = '<span class="status-badge available">🟢 AVAILABLE (${exactUnits} Units)</span>';
+        } else if (exactUnits > 0) {
+          statusBadge = '<span class="status-badge limited">🟡 LOW STOCK (${exactUnits} Units)</span>';
+        } else {
+          statusBadge = '<span class="status-badge full">🔴 UNAVAILABLE</span>';
+        }
+
+        const distanceText = f.distanceKm !== null && f.distanceKm !== undefined
+          ? `<span style="font-size: 0.8rem; color: #0284c7; font-weight: 600;">📍 ~${f.distanceKm} km away</span>`
+          : '';
+
+        // Inventory summary pills
+        const invPills = (f.inventory || []).slice(0, 8).map(inv => `
+          <span class="blood-group-tag" title="${escapeHtml(inv.component)}: ${inv.availableUnits} units available">
+            ${escapeHtml(inv.bloodGroup)}: ${inv.availableUnits}
+          </span>
+        `).join('');
+
+        return `
+          <div class="blood-card" data-hosp-id="${f.hospitalId}">
+            <div>
+              <div class="blood-card-header">
+                <div>
+                  <h4 class="blood-card-title">${escapeHtml(f.hospitalName || f.name)}</h4>
+                  <div class="blood-card-loc">📌 ${escapeHtml(f.district || 'West Bengal')} ${f.area ? '· ' + escapeHtml(f.area) : ''}</div>
+                </div>
+                ${f.isVerified ? '<span class="status-badge available" style="font-size: 0.72rem;">✓ Verified</span>' : ''}
+              </div>
+
+              <div class="blood-stock-highlight">
+                <div>
+                  <div class="blood-units-label">Exact Match Stock</div>
+                  <div class="blood-units-count">${exactUnits} <span style="font-size: 0.85rem; font-weight: 500;">units</span></div>
+                </div>
+                <div>${statusBadge}</div>
+              </div>
+
+              ${invPills ? `
+                <div style="margin-top: 10px;">
+                  <span style="font-size: 0.76rem; color: var(--muted); display: block; margin-bottom: 4px;">Compatible In-Stock Groups:</span>
+                  <div class="blood-compat-list">${invPills}</div>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="blood-card-footer">
+              <div>
+                ${distanceText}
+                <div style="font-size: 0.78rem; color: var(--muted); margin-top: 2px;">
+                  📞 <a href="tel:${escapeHtml(f.phone || '112')}" style="color: var(--primary); font-weight: 600;">${escapeHtml(f.phone || '112')}</a>
+                </div>
+              </div>
+              <button type="button" class="btn btn-blood btn-sm btn-blood-card-req" data-hosp-id="${f.hospitalId}" data-hosp-name="${escapeHtml(f.hospitalName || f.name)}">
+                🩸 Request Blood
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Attach card request buttons
+      bloodResultsGrid.querySelectorAll('.btn-blood-card-req').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openBloodRequestModal(btn.dataset.hospId);
+        });
+      });
+
+    } catch (err) {
+      bloodResultsGrid.innerHTML = `<p style="color: var(--danger); text-align: center; grid-column: 1/-1;">❌ Error searching blood banks: ${err.message}</p>`;
+    }
+  }
+
+  if (bloodSearchForm) {
+    bloodSearchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      executeBloodSearch();
+    });
+  }
+
+  if (bloodNearMeBtn) {
+    bloodNearMeBtn.addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        showToast('❌ Geolocation is not supported by your browser.');
+        return;
+      }
+      showToast('📍 Detecting current location...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userGeoLocation = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
+          showToast('✅ Location detected! Sorting blood banks by proximity.');
+          executeBloodSearch();
+        },
+        (err) => {
+          showToast('⚠️ Could not obtain location: ' + err.message);
+        },
+        { timeout: 8000 }
+      );
+    });
+  }
+
+  if (bloodResetSearchBtn) {
+    bloodResetSearchBtn.addEventListener('click', () => {
+      if (bloodSearchForm) bloodSearchForm.reset();
+      userGeoLocation = null;
+      if (bloodCompatBanner) bloodCompatBanner.hidden = true;
+      executeBloodSearch();
+    });
+  }
+
+  if (bloodEmptyResetBtn) {
+    bloodEmptyResetBtn.addEventListener('click', () => {
+      if (bloodSearchForm) bloodSearchForm.reset();
+      userGeoLocation = null;
+      executeBloodSearch();
+    });
+  }
+
+  // --- 5. MULTI-HOSPITAL BLOOD REQUEST MODAL ---
+  function openBloodRequestModal(preselectedHospId = null, patientData = null) {
+    if (!bloodRequestModalOverlay) return;
+    bloodRequestModalOverlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    // Pre-fill patient details if provided
+    if (patientData) {
+      if (bloodPatientName) bloodPatientName.value = patientData.patientName || '';
+      if (bloodPatientAge) bloodPatientAge.value = patientData.patientAge || 35;
+      if (bloodPatientSex) bloodPatientSex.value = patientData.patientSex || 'Male';
+      if (bloodContactPhone) bloodContactPhone.value = patientData.contactPhone || patientData.contactNumber || '';
+      if (bloodReqNotes) bloodReqNotes.value = patientData.notes || patientData.symptoms || 'Acute medical emergency requiring blood transfusion.';
+      if (bloodAdmittedHospital) bloodAdmittedHospital.value = patientData.district || 'West Bengal';
+    }
+
+    populateTargetHospitalsChecklist(preselectedHospId);
+  }
+
+  function closeBloodRequestModal() {
+    if (bloodRequestModalOverlay) bloodRequestModalOverlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  if (bloodReqModalCloseBtn) bloodReqModalCloseBtn.addEventListener('click', closeBloodRequestModal);
+  if (bloodReqCancelBtn) bloodReqCancelBtn.addEventListener('click', closeBloodRequestModal);
+  if (openEmergencyBloodRequestBtn) openEmergencyBloodRequestBtn.addEventListener('click', () => openBloodRequestModal());
+  if (resultsEmergencyRequestBtn) resultsEmergencyRequestBtn.addEventListener('click', () => openBloodRequestModal());
+
+  function populateTargetHospitalsChecklist(preselectedHospId = null) {
+    if (!targetHospitalChecklist) return;
+
+    targetHospitalChecklist.innerHTML = hospitals.map(h => {
+      const hId = h._id || h.id;
+      const isChecked = preselectedHospId && String(preselectedHospId) === String(hId);
+      return `
+        <label style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 4px; background: ${isChecked ? '#ffe4e6' : '#f8fafc'}; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" name="targetHospital" value="${hId}" ${isChecked ? 'checked' : ''} class="target-hosp-checkbox" data-district="${escapeHtml(h.district)}">
+            <span style="font-size: 0.86rem; font-weight: 600;">${escapeHtml(h.name)}</span>
+          </div>
+          <span style="font-size: 0.76rem; color: var(--muted); background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(h.district)}</span>
+        </label>
+      `;
+    }).join('');
+
+    updateTargetHospSummary();
+
+    targetHospitalChecklist.querySelectorAll('.target-hosp-checkbox').forEach(cb => {
+      cb.addEventListener('change', updateTargetHospSummary);
+    });
+  }
+
+  function updateTargetHospSummary() {
+    if (!targetHospCountSummary) return;
+    const checked = document.querySelectorAll('input[name="targetHospital"]:checked');
+    targetHospCountSummary.textContent = `Selected: ${checked.length} blood bank(s) for simultaneous broadcast`;
+  }
+
+  if (selectAllHospitalsInDistrictBtn) {
+    selectAllHospitalsInDistrictBtn.addEventListener('click', () => {
+      const dist = (bloodSearchDistrict && bloodSearchDistrict.value !== 'all') ? bloodSearchDistrict.value : 'Kolkata';
+      document.querySelectorAll('input[name="targetHospital"]').forEach(cb => {
+        if (cb.dataset.district === dist) cb.checked = true;
+      });
+      updateTargetHospSummary();
+    });
+  }
+
+  if (clearAllHospitalsBtn) {
+    clearAllHospitalsBtn.addEventListener('click', () => {
+      document.querySelectorAll('input[name="targetHospital"]').forEach(cb => (cb.checked = false));
+      updateTargetHospSummary();
+    });
+  }
+
+  // Submit Blood Request Form
+  if (createBloodRequestForm) {
+    createBloodRequestForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const selectedHospitals = Array.from(document.querySelectorAll('input[name="targetHospital"]:checked')).map(cb => cb.value);
+      if (!selectedHospitals.length) {
+        showToast('❌ Please select at least one hospital blood bank.');
+        return;
+      }
+
+      bloodReqSubmitBtn.disabled = true;
+      bloodReqSubmitBtn.textContent = '⏳ Broadcasting Blood Request...';
+
+      const payload = {
+        patientName: bloodPatientName.value.trim(),
+        patientAge: parseInt(bloodPatientAge.value, 10) || 35,
+        patientSex: bloodPatientSex.value,
+        contactPhone: bloodContactPhone.value.trim(),
+        bloodGroup: bloodReqGroup.value,
+        bloodComponent: bloodReqComponent.value,
+        quantity: parseInt(bloodReqQuantity.value, 10) || 1,
+        urgency: bloodReqUrgency.value,
+        notes: bloodReqNotes.value.trim() + (bloodAdmittedHospital.value ? ` (Location: ${bloodAdmittedHospital.value})` : ''),
+        targetHospitals: selectedHospitals,
+      };
+
+      try {
+        const res = await apiRequest('/blood-requests', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+
+        showToast(`🚨 Blood request dispatched to ${selectedHospitals.length} hospital blood bank(s) successfully!`);
+        closeBloodRequestModal();
+        createBloodRequestForm.reset();
+        
+        // If staff portal is open, refresh blood requests
+        loadStaffBloodRequests();
+      } catch (err) {
+        showToast(`❌ Request failed: ${formatErrorMessage(err)}`);
+      } finally {
+        bloodReqSubmitBtn.disabled = false;
+        bloodReqSubmitBtn.textContent = '🚀 DISPATCH BLOOD REQUEST';
+      }
+    });
+  }
+
+  // --- 6. VOLUNTEER DONOR REGISTRATION ---
+  if (volunteerDonorForm) {
+    volunteerDonorForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const donorName = document.getElementById('donorName')?.value.trim();
+      const donorBloodGroup = document.getElementById('donorBloodGroup')?.value;
+      const donorAge = parseInt(document.getElementById('donorAge')?.value, 10);
+      const donorGender = document.getElementById('donorGender')?.value;
+      const donorDistrictVal = document.getElementById('donorDistrict')?.value;
+      const donorCity = document.getElementById('donorCity')?.value.trim();
+      const donorPhone = document.getElementById('donorPhone')?.value.trim();
+      const donorEmail = document.getElementById('donorEmail')?.value.trim();
+
+      if (!donorName || !donorBloodGroup || !donorAge || !donorPhone || !donorDistrictVal) {
+        showToast('❌ Please fill in all required donor fields.');
+        return;
+      }
+
+      donorSubmitBtn.disabled = true;
+      donorSubmitBtn.textContent = '⏳ Registering...';
+
+      try {
+        const res = await apiRequest('/donors/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: donorName,
+            bloodGroup: donorBloodGroup,
+            age: donorAge,
+            gender: donorGender,
+            district: donorDistrictVal,
+            city: donorCity,
+            phone: donorPhone,
+            email: donorEmail || undefined,
+          }),
+        });
+
+        showToast('🎉 Thank you for volunteering! Your registration is complete and your privacy is protected.');
+        volunteerDonorForm.reset();
+      } catch (err) {
+        showToast(`❌ ${formatErrorMessage(err)}`);
+      } finally {
+        donorSubmitBtn.disabled = false;
+        donorSubmitBtn.textContent = '❤️ Register as Volunteer Donor';
+      }
+    });
+  }
+
+  // --- 7. STAFF PORTAL BLOOD REQUESTS & INVENTORY ---
+  async function loadStaffBloodRequests(filterStatus = 'all') {
+    const container = document.getElementById('staffBloodRequestsContainer');
+    if (!container) return;
+
+    container.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">Loading blood requests...</p>';
+
+    try {
+      const url = filterStatus && filterStatus !== 'all'
+        ? `/blood-requests?status=${filterStatus}`
+        : '/blood-requests';
+
+      const res = await apiRequest(url);
+      const reqs = res.data || [];
+      cachedBloodRequests = reqs;
+
+      if (!reqs.length) {
+        container.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">No blood requests recorded.</p>';
+        return;
+      }
+
+      // Sort: Emergency priority on top, then newest
+      reqs.sort((a, b) => {
+        if (a.urgency === 'Emergency' && b.urgency !== 'Emergency') return -1;
+        if (b.urgency === 'Emergency' && a.urgency !== 'Emergency') return 1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
+
+      container.innerHTML = reqs.map(r => {
+        const isEmergency = r.urgency === 'Emergency';
+        const myRecipient = (r.recipients || []).find(rec => String(rec.hospital?._id || rec.hospital) === String(userHospId));
+        const myStatus = myRecipient ? myRecipient.status : r.status;
+
+        return `
+          <div class="staff-blood-req-card ${isEmergency ? 'is-emergency' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div>
+                <span class="blood-urgency-badge ${escapeHtml(r.urgency || 'Standard')}">
+                  ${isEmergency ? '🚨 ' : ''}${escapeHtml((r.urgency || 'Standard').toUpperCase())}
+                </span>
+                <span class="status-badge" style="margin-left: 6px; font-size: 0.75rem;">${escapeHtml(myStatus)}</span>
+                <h4 style="margin: 6px 0 2px; font-size: 1.05rem;">
+                  ${escapeHtml(r.patientName)} · <strong style="color: #be123c;">${escapeHtml(r.bloodGroup)} (${escapeHtml(r.bloodComponent || 'Whole Blood')})</strong>
+                </h4>
+                <div style="font-size: 0.82rem; color: var(--muted);">
+                  Units: <strong>${r.quantity}</strong> | Age: ${r.patientAge || '—'} | Phone: ${escapeHtml(r.contactPhone || 'Private')}
+                </div>
+              </div>
+              <button type="button" class="btn btn-outline btn-xs view-blood-detail-btn" data-id="${r._id}">View Details</button>
+            </div>
+
+            ${r.notes ? `<div style="font-size: 0.82rem; font-style: italic; color: var(--secondary);">"${escapeHtml(r.notes)}"</div>` : ''}
+
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+              ${(myStatus === 'PENDING') ? `
+                <button type="button" class="btn btn-blood btn-xs action-accept-blood" data-id="${r._id}">✅ Accept &amp; Reserve</button>
+                <button type="button" class="btn btn-outline btn-xs action-partial-blood" data-id="${r._id}">⚡ Partial Accept</button>
+                <button type="button" class="btn btn-danger btn-xs action-reject-blood" data-id="${r._id}">❌ Reject</button>
+              ` : ''}
+
+              ${(myStatus === 'BLOOD_RESERVED' || myStatus === 'PARTIALLY_ACCEPTED') ? `
+                <button type="button" class="btn btn-primary btn-xs action-complete-blood" data-id="${r._id}">✔️ Complete Collection</button>
+                <button type="button" class="btn btn-ghost btn-xs action-cancel-blood" data-id="${r._id}">Cancel Reservation</button>
+              ` : ''}
+
+              <button type="button" class="btn btn-outline btn-xs action-broadcast-donor" data-id="${r._id}" data-group="${escapeHtml(r.bloodGroup)}" data-units="${r.quantity}">
+                📢 Broadcast to Donors
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Attach event listeners
+      container.querySelectorAll('.view-blood-detail-btn').forEach(btn => {
+        btn.addEventListener('click', () => openBloodRequestDetailModal(btn.dataset.id));
+      });
+
+      container.querySelectorAll('.action-accept-blood').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await apiRequest(`/blood-requests/${btn.dataset.id}/accept`, { method: 'POST' });
+            showToast('✅ Blood request accepted. Units reserved atomically.');
+            loadStaffBloodRequests();
+          } catch (e) {
+            showToast(`❌ ${formatErrorMessage(e)}`);
+          }
+        });
+      });
+
+      container.querySelectorAll('.action-partial-blood').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeBloodRequestIdForAction = btn.dataset.id;
+          if (bloodPartialAcceptModalOverlay) bloodPartialAcceptModalOverlay.hidden = false;
+        });
+      });
+
+      container.querySelectorAll('.action-reject-blood').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeBloodRequestIdForAction = btn.dataset.id;
+          if (bloodRejectModalOverlay) bloodRejectModalOverlay.hidden = false;
+        });
+      });
+
+      container.querySelectorAll('.action-complete-blood').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await apiRequest(`/blood-requests/${btn.dataset.id}/complete`, { method: 'POST' });
+            showToast('✔️ Blood collection completed. Stock converted to used.');
+            loadStaffBloodRequests();
+          } catch (e) {
+            showToast(`❌ ${formatErrorMessage(e)}`);
+          }
+        });
+      });
+
+      container.querySelectorAll('.action-cancel-blood').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await apiRequest(`/blood-requests/${btn.dataset.id}/cancel`, { method: 'POST' });
+            showToast('Blood request cancelled. Stock released back to available pool.');
+            loadStaffBloodRequests();
+          } catch (e) {
+            showToast(`❌ ${formatErrorMessage(e)}`);
+          }
+        });
+      });
+
+      container.querySelectorAll('.action-broadcast-donor').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeBloodRequestIdForAction = btn.dataset.id;
+          if (donorBroadcastInfo) {
+            donorBroadcastInfo.innerHTML = `
+              <strong>Broadcast Target:</strong> All volunteer donors with blood group <strong>${btn.dataset.group}</strong>.<br>
+              <strong>Units Urgently Needed:</strong> ${btn.dataset.units} units.
+            `;
+          }
+          if (bloodDonorBroadcastModalOverlay) bloodDonorBroadcastModalOverlay.hidden = false;
+        });
+      });
+
+    } catch (err) {
+      container.innerHTML = `<p style="color: var(--muted); font-size: 0.88rem;">Error loading blood requests: ${err.message}</p>`;
+    }
+  }
+
+  // Filter chips for blood requests
+  document.querySelectorAll('.blood-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.blood-filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      loadStaffBloodRequests(chip.dataset.status);
+    });
+  });
+
+  // Prompt handlers
+  if (partialCancelBtn) {
+    partialCancelBtn.addEventListener('click', () => {
+      if (bloodPartialAcceptModalOverlay) bloodPartialAcceptModalOverlay.hidden = true;
+    });
+  }
+
+  if (partialConfirmBtn) {
+    partialConfirmBtn.addEventListener('click', async () => {
+      const units = parseInt(partialUnitsInput.value, 10);
+      if (!units || units <= 0) {
+        showToast('❌ Enter valid units.');
+        return;
+      }
+      try {
+        await apiRequest(`/blood-requests/${activeBloodRequestIdForAction}/partial-accept`, {
+          method: 'POST',
+          body: JSON.stringify({ availableUnits: units, notes: partialNotesInput.value.trim() }),
+        });
+        showToast(`✅ Partially accepted and reserved ${units} units.`);
+        if (bloodPartialAcceptModalOverlay) bloodPartialAcceptModalOverlay.hidden = true;
+        loadStaffBloodRequests();
+      } catch (e) {
+        showToast(`❌ ${formatErrorMessage(e)}`);
+      }
+    });
+  }
+
+  if (bloodRejectCancelBtn) {
+    bloodRejectCancelBtn.addEventListener('click', () => {
+      if (bloodRejectModalOverlay) bloodRejectModalOverlay.hidden = true;
+    });
+  }
+
+  if (bloodRejectConfirmBtn) {
+    bloodRejectConfirmBtn.addEventListener('click', async () => {
+      const reason = bloodRejectReasonInput.value.trim();
+      if (!reason) {
+        showToast('❌ Rejection reason is mandatory.');
+        return;
+      }
+      try {
+        await apiRequest(`/blood-requests/${activeBloodRequestIdForAction}/reject`, {
+          method: 'POST',
+          body: JSON.stringify({ reason }),
+        });
+        showToast('Blood request rejected.');
+        if (bloodRejectModalOverlay) bloodRejectModalOverlay.hidden = true;
+        loadStaffBloodRequests();
+      } catch (e) {
+        showToast(`❌ ${formatErrorMessage(e)}`);
+      }
+    });
+  }
+
+  if (donorBroadcastCancelBtn) {
+    donorBroadcastCancelBtn.addEventListener('click', () => {
+      if (bloodDonorBroadcastModalOverlay) bloodDonorBroadcastModalOverlay.hidden = true;
+    });
+  }
+
+  if (donorBroadcastConfirmBtn) {
+    donorBroadcastConfirmBtn.addEventListener('click', async () => {
+      const phone = broadcastContactDetails.value.trim();
+      if (!phone) {
+        showToast('❌ Please provide contact phone for donors.');
+        return;
+      }
+      try {
+        const reqItem = cachedBloodRequests.find(r => r._id === activeBloodRequestIdForAction);
+        await apiRequest('/donors/emergency-broadcast', {
+          method: 'POST',
+          body: JSON.stringify({
+            bloodGroup: reqItem?.bloodGroup || 'O-',
+            unitsRequired: reqItem?.quantity || 2,
+            contactDetails: phone,
+          }),
+        });
+        showToast('📢 Emergency broadcast alert sent to registered donors!');
+        if (bloodDonorBroadcastModalOverlay) bloodDonorBroadcastModalOverlay.hidden = true;
+      } catch (e) {
+        showToast(`❌ ${formatErrorMessage(e)}`);
+      }
+    });
+  }
+
+  // Details Modal
+  async function openBloodRequestDetailModal(reqId) {
+    if (!bloodRequestDetailModalOverlay) return;
+    bloodRequestDetailModalOverlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    try {
+      const res = await apiRequest(`/blood-requests/${reqId}`);
+      const req = res.data;
+      if (bloodDetailSubtitle) bloodDetailSubtitle.textContent = `Request #${req._id}`;
+      if (bloodDetailStatusBadge) {
+        bloodDetailStatusBadge.textContent = req.status;
+        bloodDetailStatusBadge.className = `status-badge ${req.status.toLowerCase()}`;
+      }
+
+      let recipientsTable = '<p style="color: var(--muted);">No recipient hospitals recorded.</p>';
+      if (req.recipients && req.recipients.length) {
+        recipientsTable = `
+          <table class="staff-table" style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Blood Bank</th>
+                <th>Status</th>
+                <th>Reserved</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${req.recipients.map(rec => `
+                <tr>
+                  <td><strong>${escapeHtml(rec.hospital?.name || rec.hospital || 'Hospital')}</strong></td>
+                  <td><span class="status-badge ${(rec.status || '').toLowerCase()}">${escapeHtml(rec.status)}</span></td>
+                  <td>${rec.reservedUnits || 0} units</td>
+                  <td>${escapeHtml(rec.notes || rec.rejectionReason || '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      bloodDetailBody.innerHTML = `
+        <div class="admin-panel-card" style="margin-bottom: 12px;">
+          <h4 style="margin: 0 0 6px; font-size: 0.95rem;">Patient Identity &amp; Clinical Need</h4>
+          <p style="margin: 0 0 4px;"><strong>Patient:</strong> ${escapeHtml(req.patientName)} (${req.patientAge || '—'}y, ${req.patientSex || '—'})</p>
+          <p style="margin: 0 0 4px;"><strong>Blood Needed:</strong> ${escapeHtml(req.bloodGroup)} · ${escapeHtml(req.bloodComponent || 'Whole Blood')} (${req.quantity} Units)</p>
+          <p style="margin: 0 0 4px;"><strong>Urgency:</strong> <span class="blood-urgency-badge ${escapeHtml(req.urgency)}">${escapeHtml(req.urgency)}</span></p>
+          <p style="margin: 0 0 4px;"><strong>Contact Phone:</strong> ${escapeHtml(req.contactPhone || 'Private')}</p>
+          <p style="margin: 0;"><strong>Diagnosis / Indication:</strong> "${escapeHtml(req.notes || 'Emergency requirement')}"</p>
+        </div>
+
+        <div class="admin-panel-card">
+          <h4 style="margin: 0 0 6px; font-size: 0.95rem;">Multi-Hospital Broadcast Status (${req.recipients ? req.recipients.length : 0} Facilities)</h4>
+          <div class="table-responsive">${recipientsTable}</div>
+        </div>
+      `;
+
+      bloodDetailActions.innerHTML = '<button type="button" class="btn btn-ghost" id="bloodDetailCloseBtn2">CLOSE</button>';
+      document.getElementById('bloodDetailCloseBtn2')?.addEventListener('click', closeBloodRequestDetailModal);
+
+    } catch (e) {
+      bloodDetailBody.innerHTML = `<p style="color: var(--danger);">Error loading details: ${e.message}</p>`;
+    }
+  }
+
+  function closeBloodRequestDetailModal() {
+    if (bloodRequestDetailModalOverlay) bloodRequestDetailModalOverlay.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  if (bloodDetailModalCloseBtn) bloodDetailModalCloseBtn.addEventListener('click', closeBloodRequestDetailModal);
+
+  // --- 8. STAFF BLOOD INVENTORY MANAGEMENT ---
+  async function loadStaffBloodInventory() {
+    const container = document.getElementById('staffBloodInventoryContainer');
+    const badges = document.getElementById('bloodInvSummaryBadges');
+    if (!container) return;
+
+    container.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">Loading inventory records...</p>';
+
+    try {
+      const res = await apiRequest('/blood-inventory/all');
+      const inv = res.data || [];
+
+      if (badges) {
+        badges.innerHTML = `
+          <span class="status-badge available">Total Types: ${inv.length}</span>
+          <span class="status-badge limited">Low Stock Alerts: ${res.lowStockCount || 0}</span>
+        `;
+      }
+
+      if (!inv.length) {
+        container.innerHTML = '<p style="color: var(--muted); font-size: 0.88rem;">No inventory records available.</p>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="staff-table" style="font-size: 0.84rem;">
+          <thead>
+            <tr>
+              <th>Blood Group</th>
+              <th>Component</th>
+              <th>Available</th>
+              <th>Reserved</th>
+              <th>Used</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${inv.map(item => {
+              const stClass = item.status === 'Available' ? 'available' : (item.status === 'Low Stock' ? 'limited' : 'full');
+              return `
+                <tr>
+                  <td><strong>${escapeHtml(item.bloodGroup)}</strong></td>
+                  <td>${escapeHtml(item.component)}</td>
+                  <td><strong style="color: #16a34a; font-size: 1rem;">${item.availableUnits}</strong></td>
+                  <td>${item.reservedUnits}</td>
+                  <td>${item.usedUnits}</td>
+                  <td>${item.totalUnits}</td>
+                  <td><span class="status-badge ${stClass}">${escapeHtml(item.status)}</span></td>
+                  <td>
+                    <button type="button" class="btn btn-outline btn-xs edit-stock-btn" data-group="${escapeHtml(item.bloodGroup)}" data-component="${escapeHtml(item.component)}" data-total="${item.totalUnits}" data-min="${item.minThreshold}">
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      container.querySelectorAll('.edit-stock-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (invBloodGroup) invBloodGroup.value = btn.dataset.group;
+          if (invComponent) invComponent.value = btn.dataset.component;
+          if (invTotalUnits) invTotalUnits.value = btn.dataset.total;
+          if (invMinThreshold) invMinThreshold.value = btn.dataset.min;
+          if (updateStockModalOverlay) updateStockModalOverlay.hidden = false;
+        });
+      });
+
+    } catch (e) {
+      container.innerHTML = `<p style="color: var(--danger);">Error loading inventory: ${e.message}</p>`;
+    }
+  }
+
+  if (openAddBloodStockBtn) {
+    openAddBloodStockBtn.addEventListener('click', () => {
+      if (updateStockModalOverlay) updateStockModalOverlay.hidden = false;
+    });
+  }
+
+  if (updateStockCloseBtn) {
+    updateStockCloseBtn.addEventListener('click', () => {
+      if (updateStockModalOverlay) updateStockModalOverlay.hidden = true;
+    });
+  }
+
+  if (updateStockCancelBtn) {
+    updateStockCancelBtn.addEventListener('click', () => {
+      if (updateStockModalOverlay) updateStockModalOverlay.hidden = true;
+    });
+  }
+
+  if (updateStockForm) {
+    updateStockForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
+      if (!userHospId) {
+        showToast('❌ No hospital linked to logged-in user.');
+        return;
+      }
+
+      try {
+        await apiRequest('/blood-inventory/update', {
+          method: 'POST',
+          body: JSON.stringify({
+            hospitalId: String(userHospId),
+            bloodGroup: invBloodGroup.value,
+            component: invComponent.value,
+            totalUnits: parseInt(invTotalUnits.value, 10),
+            minThreshold: parseInt(invMinThreshold.value, 10) || 5,
+          }),
+        });
+        showToast('✅ Blood inventory updated.');
+        if (updateStockModalOverlay) updateStockModalOverlay.hidden = true;
+        loadStaffBloodInventory();
+      } catch (err) {
+        showToast(`❌ ${formatErrorMessage(err)}`);
+      }
+    });
+  }
+
+  // --- 9. EMERGENCY PATIENT INTAKE INTEGRATION ---
+  // Hook into Patient Intake to offer one-click emergency blood request
+  const intakeFormEl = document.getElementById('patientIntakeForm');
+  if (intakeFormEl) {
+    const origSubmit = intakeFormEl.onsubmit;
+    document.addEventListener('patientIntakeCompleted', (e) => {
+      const data = e.detail;
+      const alertBox = document.getElementById('intakeAlertBox');
+      if (alertBox) {
+        const bloodBtn = document.createElement('div');
+        bloodBtn.style.marginTop = '10px';
+        bloodBtn.innerHTML = `
+          <button type="button" class="btn btn-blood btn-sm" id="intakeReqBloodBtn">
+            🩸 Request Emergency Blood for this Patient
+          </button>
+        `;
+        alertBox.appendChild(bloodBtn);
+
+        document.getElementById('intakeReqBloodBtn')?.addEventListener('click', () => {
+          showBloodBankPortal(true);
+          openBloodRequestModal(null, {
+            patientName: data.patientName,
+            patientAge: data.age,
+            patientSex: data.sex,
+            contactPhone: data.contactNumber,
+            notes: data.symptoms || data.condition,
+            district: data.district,
+          });
+        });
+      }
+    });
+  }
+
+  // --- 10. REAL-TIME SOCKET.IO LISTENERS FOR BLOOD ---
+  if (typeof io !== 'undefined') {
+    try {
+      const bSocket = io();
+      bSocket.on('bloodRequestCreated', (data) => {
+        showToast('🔔 New emergency blood request broadcasted across network!');
+        const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
+        if (userHospId) loadStaffBloodRequests();
+      });
+
+      bSocket.on('bloodRequestUpdated', () => {
+        loadStaffBloodRequests();
+      });
+
+      bSocket.on('bloodInventoryUpdated', () => {
+        loadStaffBloodInventory();
+        fetchBloodBankStatistics();
       });
     } catch (e) {}
   }

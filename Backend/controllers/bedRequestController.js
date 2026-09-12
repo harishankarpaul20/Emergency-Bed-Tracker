@@ -60,29 +60,76 @@ const getBedRequests = async (req, res, next) => {
   try {
     let filter = {};
 
+    const reqType = req.query.requestType ? req.query.requestType.toUpperCase() : null;
+
     if (req.user.role === 'user') {
       filter.user = req.user._id;
     } else if (req.user.role === 'hospital_admin') {
-      const userHosp = req.user.hospitalId || req.user.hospital;
+      const userHosp = req.user.hospitalId || req.user.hospital?._id || req.user.hospital;
       if (!userHosp) {
         return res.status(200).json({
           success: true,
           data: [],
-          message: 'No hospital assigned to this administrator account.',
+          message: 'No hospital assigned to this account.',
         });
       }
-      filter.hospital = userHosp;
+      if (reqType === 'BLOOD') {
+        filter.$or = [
+          { hospital: userHosp },
+          { targetHospitals: userHosp },
+          { 'recipients.hospital': userHosp },
+        ];
+      } else {
+        filter.hospital = userHosp;
+      }
+    } else if (['doctor', 'blood_bank_staff'].includes(req.user.role)) {
+      const userHosp = req.user.hospitalId || req.user.hospital?._id || req.user.hospital;
+      if (!userHosp) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: 'No hospital assigned to this account.',
+        });
+      }
+      if (reqType === 'BLOOD') {
+        filter.$or = [
+          { hospital: userHosp },
+          { targetHospitals: userHosp },
+          { 'recipients.hospital': userHosp },
+          { requestingHospital: userHosp },
+        ];
+      } else {
+        filter.hospital = userHosp;
+      }
     } else if (req.user.role === 'super_admin') {
-      if (req.query.hospital) filter.hospital = req.query.hospital;
+      if (req.query.hospital) {
+        if (reqType === 'BLOOD') {
+          filter.$or = [
+            { hospital: req.query.hospital },
+            { targetHospitals: req.query.hospital },
+            { 'recipients.hospital': req.query.hospital },
+          ];
+        } else {
+          filter.hospital = req.query.hospital;
+        }
+      }
     }
 
     if (req.query.status) {
       filter.status = req.query.status;
     }
 
+    if (req.query.requestType && req.query.requestType !== 'all') {
+      filter.requestType = req.query.requestType.toUpperCase();
+    }
+
     const requests = await BedRequest.find(filter)
       .populate('hospital', 'name district area phone address')
       .populate('user', 'name email phone')
+      .populate('targetHospitals', 'name district area phone')
+      .populate('recipients.hospital', 'name district area phone')
+      .populate('requestingHospital', 'name district phone')
+      .populate('requestingDoctor', 'name email specialization')
       .sort({ createdAt: -1 })
       .lean();
 

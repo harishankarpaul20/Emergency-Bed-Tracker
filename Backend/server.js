@@ -21,6 +21,9 @@ const bedRequestRoutes = require('./routes/bedRequestRoutes');
 const emergencyRoutes = require('./routes/emergencyRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const referralRoutes = require('./routes/referralRoutes');
+const bloodBankRoutes = require('./routes/bloodBankRoutes');
+const bloodRequestRoutes = require('./routes/bloodRequestRoutes');
+const donorRoutes = require('./routes/donorRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -172,6 +175,11 @@ app.use('/api/bed-requests', bedRequestRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/blood-banks', bloodBankRoutes);
+app.use('/api/blood-availability', bloodBankRoutes);
+app.use('/api/blood-inventory', bloodBankRoutes);
+app.use('/api/blood-requests', bloodRequestRoutes);
+app.use('/api/donors', donorRoutes);
 
 // 404 & Global Error Handling
 app.use(notFound);
