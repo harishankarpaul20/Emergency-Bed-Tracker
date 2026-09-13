@@ -155,6 +155,7 @@ const getBedRequests = async (req, res, next) => {
     const requests = await BedRequest.find(filter)
       .populate('hospital', 'name district area phone address')
       .populate('user', 'name email phone')
+      .populate('bed', 'type totalBeds occupiedBeds reservedBeds availableBeds')
       .populate('targetHospitals', 'name district area phone')
       .populate('recipients.hospital', 'name district area phone')
       .populate('requestingHospital', 'name district phone')
@@ -180,7 +181,8 @@ const getBedRequestById = async (req, res, next) => {
   try {
     const request = await BedRequest.findById(req.params.id)
       .populate('hospital', 'name district area phone address')
-      .populate('user', 'name email phone');
+      .populate('user', 'name email phone')
+      .populate('bed', 'type totalBeds occupiedBeds reservedBeds availableBeds');
 
     if (!request) {
       return res.status(404).json({
@@ -191,8 +193,10 @@ const getBedRequestById = async (req, res, next) => {
     }
 
     // Permission check
-    const isOwner = request.user._id.toString() === req.user._id.toString();
-    const isAdmin = isUserAdminForHospital(req.user, request.hospital._id);
+    const userId = (request.user?._id || request.user)?.toString();
+    const hospId = (request.hospital?._id || request.hospital);
+    const isOwner = userId === req.user._id.toString();
+    const isAdmin = isUserAdminForHospital(req.user, hospId);
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({

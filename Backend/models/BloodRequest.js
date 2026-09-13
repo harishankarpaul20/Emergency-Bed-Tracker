@@ -123,6 +123,11 @@ const bloodRequestSchema = new mongoose.Schema(
 
     // B. REQUESTER DETAILS (The person/doctor submitting the request)
     requester: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true,
+      },
       user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -287,6 +292,7 @@ bloodRequestSchema.virtual('targetHospitals').get(function () {
 bloodRequestSchema.index({ status: 1, 'bloodRequirement.urgency': 1, createdAt: -1 });
 bloodRequestSchema.index({ 'recipients.hospital': 1, status: 1 });
 bloodRequestSchema.index({ 'requester.user': 1, createdAt: -1 });
+bloodRequestSchema.index({ 'requester.userId': 1, createdAt: -1 });
 bloodRequestSchema.index({ 'bloodRequirement.bloodGroup': 1, 'bloodRequirement.component': 1 });
 
 const BloodRequest = mongoose.model('BloodRequest', bloodRequestSchema);

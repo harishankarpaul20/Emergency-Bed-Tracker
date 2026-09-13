@@ -8,7 +8,10 @@ const EmergencyIntake = require('../models/EmergencyIntake');
  */
 const submitIntake = async (req, res, next) => {
   try {
+    console.log("EMERGENCY INTAKE ROUTE HIT");
+    console.log("REQUEST RECEIVED");
     const intakeResult = await processEmergencyIntake(req.body);
+    console.log("SAVE SUCCESS");
 
     res.status(201).json({
       success: true,
@@ -16,6 +19,7 @@ const submitIntake = async (req, res, next) => {
       data: intakeResult,
     });
   } catch (error) {
+    console.error("EMERGENCY INTAKE SAVE ERROR:", error);
     next(error);
   }
 };

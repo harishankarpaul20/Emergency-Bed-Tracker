@@ -150,7 +150,27 @@
       headers,
     };
 
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    let res;
+    try {
+      res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    } catch (netErr) {
+      const prodApiUrl = 'https://emergency-bed-tracker.onrender.com/api';
+      const isLocal = window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1' ||
+                      window.location.protocol === 'file:';
+      if (isLocal && API_BASE_URL !== prodApiUrl) {
+        console.warn(`Local backend unreachable at ${API_BASE_URL}. Retrying with live Render backend: ${prodApiUrl}`);
+        try {
+          res = await fetch(`${prodApiUrl}${endpoint}`, config);
+          window.API_BASE_URL = prodApiUrl;
+        } catch (fbErr) {
+          throw netErr;
+        }
+      } else {
+        throw netErr;
+      }
+    }
+
     let body = {};
     try {
       body = await res.json();
@@ -505,16 +525,18 @@
     return list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
   }
 
+  let searchDebounceTimer = null;
   function searchHospitals() {
+    clearTimeout(searchDebounceTimer);
     loadingState.hidden = false;
     hospitalGrid.style.opacity = '0.4';
 
-    setTimeout(() => {
+    searchDebounceTimer = setTimeout(() => {
       const results = filterHospitals();
       renderHospitals(results);
       hospitalGrid.style.opacity = '1';
       loadingState.hidden = true;
-    }, 200);
+    }, 150);
   }
 
   function clearFilters() {
@@ -953,12 +975,34 @@
         return;
       }
 
-      staffRequestsContainer.innerHTML = reqs.slice(0, 10).map(r => `
+      staffRequestsContainer.innerHTML = reqs.slice(0, 10).map(r => {
+        const patientDisplayName = escapeHtml(r.patientName || (r.user && typeof r.user === 'object' ? r.user.name : '') || 'Patient');
+        const userDoc = (r.user && typeof r.user === 'object') ? r.user : null;
+        const requesterName = userDoc?.name ? escapeHtml(userDoc.name) : '';
+        const hasDiffRequester = requesterName && requesterName.toLowerCase() !== (r.patientName || '').toLowerCase();
+
+        const hospDoc = (r.hospital && typeof r.hospital === 'object') ? r.hospital : null;
+        const hospDisplayName = hospDoc?.name ? escapeHtml(hospDoc.name) : '';
+        const hospLoc = hospDoc ? [hospDoc.area, hospDoc.district].filter(Boolean).map(escapeHtml).join(', ') : '';
+
+        const bedDoc = (r.bed && typeof r.bed === 'object') ? r.bed : null;
+        const bedTypeStr = escapeHtml((bedDoc?.type || r.bedType || 'General').toUpperCase());
+        const bedStats = (bedDoc && typeof bedDoc.availableBeds === 'number')
+          ? ` (${bedDoc.availableBeds} avail / ${bedDoc.totalBeds || 0} total)`
+          : '';
+
+        const phoneDisplay = escapeHtml(r.contactPhone || userDoc?.phone || 'N/A');
+        const statusStr = escapeHtml((r.status || 'pending').toUpperCase());
+        const statusClass = escapeHtml(r.status || 'pending');
+
+        return `
         <div class="staff-req-card" data-req-id="${r._id}">
           <div class="staff-req-info">
-            <h4>${escapeHtml(r.patientName)} · <span class="status-badge ${r.status}">${escapeHtml(r.status.toUpperCase())}</span></h4>
-            <p>Type: <strong>${escapeHtml(r.bedType.toUpperCase())}</strong> · Phone: ${escapeHtml(r.contactPhone)}</p>
-            ${r.notes ? `<p style="font-style: italic;">"${escapeHtml(r.notes)}"</p>` : ''}
+            <h4>${patientDisplayName} · <span class="status-badge ${statusClass}">${statusStr}</span></h4>
+            ${hospDisplayName ? `<p style="margin-bottom: 2px;">🏥 <strong>${hospDisplayName}</strong>${hospLoc ? ` <span style="font-size: 0.78rem;">(${hospLoc})</span>` : ''}</p>` : ''}
+            <p style="margin-bottom: 2px;">🛏️ Bed: <strong>${bedTypeStr}</strong>${bedStats} · 📞 Phone: ${phoneDisplay}</p>
+            ${hasDiffRequester ? `<p style="font-size: 0.78rem; color: var(--muted); margin-bottom: 2px;">👤 Requested by: <strong>${requesterName}</strong>${userDoc.phone ? ` (${escapeHtml(userDoc.phone)})` : ''}</p>` : ''}
+            ${r.notes ? `<p style="font-style: italic; margin-top: 3px;">"${escapeHtml(r.notes)}"</p>` : ''}
           </div>
           <div class="staff-req-actions">
             ${r.status === 'pending' ? `
@@ -968,7 +1012,8 @@
             <button type="button" class="btn btn-outline btn-xs req-refer-btn" data-id="${r._id}" style="color: #0284c7; border-color: #0284c7;">REFER PATIENT</button>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       staffRequestsContainer.querySelectorAll('.req-approve-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -1168,15 +1213,20 @@
     const target = Number(el.dataset.countTarget || el.dataset.count || 0);
     const duration = 1000;
     const start = performance.now();
+    if (el._rafId) cancelAnimationFrame(el._rafId);
 
     function tick(now) {
       const progress = Math.min((now - start) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
       el.textContent = Math.round(eased * target);
-      if (progress < 1) requestAnimationFrame(tick);
-      else el.textContent = target;
+      if (progress < 1) {
+        el._rafId = requestAnimationFrame(tick);
+      } else {
+        el.textContent = target;
+        el._rafId = null;
+      }
     }
-    requestAnimationFrame(tick);
+    el._rafId = requestAnimationFrame(tick);
   }
 
   const counterObserver = new IntersectionObserver((entries) => {
@@ -1296,7 +1346,8 @@
 
       marker.on('popupopen', () => {
         const link = document.querySelector(`.leaflet-popup-content a[data-id="${targetId}"]`);
-        if (link) {
+        if (link && !link._hasClickListener) {
+          link._hasClickListener = true;
           link.addEventListener('click', (e) => {
             e.preventDefault();
             showHospitalDetails(targetId);
@@ -1374,6 +1425,19 @@
     fetchHospitalsFromBackend();
     fetchStatisticsFromBackend();
     initSocket();
+
+    // Restore authenticated session if token exists
+    if (authToken && !currentUser) {
+      apiRequest('/auth/me')
+        .then(res => {
+          if (res.data) currentUser = res.data;
+        })
+        .catch(() => {
+          authToken = '';
+          currentUser = null;
+          localStorage.removeItem('medbed_auth_token');
+        });
+    }
 
     // Initialize Emergency Patient Intake feature
     initEmergencyIntake();
@@ -1688,11 +1752,14 @@
       const selectedConditionEl = document.querySelector('input[name="patientCondition"]:checked');
       const selectedAmbulanceEl = document.querySelector('input[name="intakeAmbulance"]:checked');
 
+      const rawContact = document.getElementById('intakeContact').value.trim();
+      const cleanContact = rawContact.replace(/[\s\-\(\)]/g, '').replace(/^(\+91|0)/, '');
+
       const formData = {
         patientName: document.getElementById('intakePatientName').value.trim(),
         age: document.getElementById('intakeAge').value.trim(),
         sex: document.getElementById('intakeSex').value,
-        contactNumber: document.getElementById('intakeContact').value.trim(),
+        contactNumber: cleanContact,
         attendantName: document.getElementById('intakeAttendant').value.trim(),
         district: document.getElementById('intakeDistrict').value,
         area: document.getElementById('intakeArea').value.trim(),
@@ -1709,38 +1776,24 @@
 
       // UI state during processing
       intakeSubmitBtn.disabled = true;
-      intakeSubmitBtn.textContent = '⏳ Processing Emergency Intake...';
+      intakeSubmitBtn.textContent = '⏳ Saving Patient Intake to Database...';
       if (intakeLoadingBox) intakeLoadingBox.hidden = false;
       if (intakeAlertBox) intakeAlertBox.hidden = true;
 
       try {
-        let recommendedHospitals = [];
-        let applicationPriority = 'Emergency assessment';
+        // Send request to real backend and AWAIT real MongoDB save
+        const result = await apiRequest('/emergency/intake', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
 
-        let isLiveBackend = false;
-        try {
-          const res = await fetch(`${API_BASE_URL}/emergency/intake`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData),
-          });
-
-          const result = await res.json();
-
-          if (!res.ok) {
-            throw new Error(result.message || 'Failed to submit emergency intake');
-          }
-
-          if (result.success && result.data) {
-            recommendedHospitals = result.data.recommendedHospitals || [];
-            applicationPriority = result.data.applicationPriority || 'Emergency assessment';
-            isLiveBackend = true;
-          }
-        } catch (apiErr) {
-          console.warn('Backend unavailable, using emergency fallback matching:', apiErr.message);
-          recommendedHospitals = clientSidePrioritizeHospitals(formData);
-          applicationPriority = CONDITION_PRIORITY_CONFIG[formData.condition]?.label || 'Emergency assessment';
+        if (!result.success || !result.data) {
+          throw new Error(result.message || 'Failed to save emergency patient intake');
         }
+
+        const intakeId = result.data.intakeId;
+        const recommendedHospitals = result.data.recommendedHospitals || [];
+        const applicationPriority = result.data.applicationPriority || 'Emergency assessment';
 
         // Render recommended hospitals into the single unified hospital list
         if (recommendedHospitals && recommendedHospitals.length > 0) {
@@ -1772,24 +1825,23 @@
             hospitalsSection.scrollIntoView({ behavior: 'smooth' });
           }
 
-          if (isLiveBackend) {
-            showToast('✅ Intake saved to database & suitable hospitals prioritized below.');
-          } else {
-            showToast('⚠️ Backend unreachable (using local demo records). Check connection.');
-          }
+          showToast(`✅ Patient intake saved to MongoDB! (ID: ${intakeId ? String(intakeId).slice(-6) : 'Confirmed'})`);
         } else {
           renderHospitals([]);
           const hospitalsSection = document.getElementById('hospitals');
           if (hospitalsSection) {
             hospitalsSection.scrollIntoView({ behavior: 'smooth' });
           }
+          showToast(`✅ Patient intake saved to MongoDB (ID: ${intakeId ? String(intakeId).slice(-6) : 'Confirmed'}). No hospitals currently match.`);
         }
       } catch (err) {
         console.error('Intake submission error:', err);
+        const errorMsg = err.message || 'Unable to save emergency intake to database. Please check connection or call 112.';
         if (intakeAlertBox) {
-          intakeAlertBox.textContent = '⚠️ Unable to process emergency intake right now. Please dial 112 immediately for emergency care.';
+          intakeAlertBox.textContent = `❌ Database save failed: ${errorMsg}`;
           intakeAlertBox.hidden = false;
         }
+        showToast(`❌ Intake save failed: ${errorMsg}`);
       } finally {
         intakeSubmitBtn.disabled = false;
         intakeSubmitBtn.textContent = '🚨 FIND SUITABLE HOSPITALS';
@@ -2719,6 +2771,8 @@
   // --- 1. VIEW ROUTING & NAVIGATION (BLOOD BANK <-> MAIN HOMEPAGE) ---
   function showBloodBankPortal(updateHistory = true) {
     if (!bloodBankPortal) return;
+    const medPortal = document.getElementById('medicalShopPortal');
+    if (medPortal) medPortal.hidden = true;
     const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
     
     // Hide all main homepage sections
@@ -2726,9 +2780,7 @@
     bloodBankPortal.hidden = false;
 
     // Position at the very top of the portal
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0 });
 
     if (mobileMenu && mobileMenu.classList.contains('open')) {
       mobileMenu.classList.remove('open');
@@ -2745,14 +2797,15 @@
   }
 
   function navigateToOriginalHome(updateHistory = true, targetSectionId = null) {
-    if (!bloodBankPortal) return;
-    const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
+    const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal):not(#medicalShopPortal)');
     
     // 1. Unhide all original homepage sections
     mainSections.forEach(s => (s.hidden = false));
 
-    // 2. Hide Blood Bank Portal completely
-    bloodBankPortal.hidden = true;
+    // 2. Hide Blood Bank Portal and Medical Shop Portal completely
+    if (bloodBankPortal) bloodBankPortal.hidden = true;
+    const medPortal = document.getElementById('medicalShopPortal');
+    if (medPortal) medPortal.hidden = true;
 
     // 3. Close mobile drawer menu if open
     if (mobileMenu && mobileMenu.classList.contains('open')) {
@@ -2780,13 +2833,12 @@
     }
 
     // 6. Ensure the page starts at the very top of the original homepage
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0 });
   }
 
   // A) [ 🩸 Blood Bank ] button click handlers (Desktop, Mobile, Nav)
-  [navBloodBankBtn, navBloodBankLink, mobileBloodBankBtn].forEach(btn => {
+  const heroBloodBankBtn = document.getElementById('heroBloodBankBtn');
+  [navBloodBankBtn, navBloodBankLink, mobileBloodBankBtn, heroBloodBankBtn].forEach(btn => {
     if (btn) {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -2819,13 +2871,16 @@
     });
   });
 
-  // E) Other Navbar links when inside Blood Bank Portal (#find-beds, #hospitals, etc.)
+  // E) Other Navbar links when inside Blood Bank Portal or Medical Shop Portal
   document.querySelectorAll('#navLinks a, #mobileMenu a, .footer-links a').forEach(link => {
     const href = link.getAttribute('href');
-    if (!href || href === '#blood-bank' || href.startsWith('tel:') || href === '#staff-portal') return;
+    if (!href || href === '#blood-bank' || href === '#medical-shops' || href.startsWith('tel:') || href === '#staff-portal') return;
 
     link.addEventListener('click', (e) => {
-      if (bloodBankPortal && !bloodBankPortal.hidden) {
+      const medPortal = document.getElementById('medicalShopPortal');
+      const isBloodActive = bloodBankPortal && !bloodBankPortal.hidden;
+      const isMedActive = medPortal && !medPortal.hidden;
+      if (isBloodActive || isMedActive) {
         e.preventDefault();
         if (href === '#main-content' || href === '#home') {
           navigateToOriginalHome(true);
@@ -2839,12 +2894,21 @@
   // F) Browser Back & Forward button handling (popstate & hashchange)
   function handleNavigationSync() {
     const hash = window.location.hash;
+    const medPortal = document.getElementById('medicalShopPortal');
     if (hash === '#blood-bank') {
+      if (medPortal) medPortal.hidden = true;
       if (bloodBankPortal && bloodBankPortal.hidden) {
         showBloodBankPortal(false); // don't push duplicate history entry
       }
+    } else if (hash === '#medical-shops') {
+      if (bloodBankPortal) bloodBankPortal.hidden = true;
+      if (medPortal && medPortal.hidden && typeof showMedicalShopPortal === 'function') {
+        showMedicalShopPortal(false);
+      }
     } else {
-      if (bloodBankPortal && !bloodBankPortal.hidden) {
+      const isBloodActive = bloodBankPortal && !bloodBankPortal.hidden;
+      const isMedActive = medPortal && !medPortal.hidden;
+      if (isBloodActive || isMedActive) {
         navigateToOriginalHome(false, hash || null); // don't push duplicate history entry
       }
     }
@@ -2856,9 +2920,15 @@
   // G) Initial load route check
   if (window.location.hash === '#blood-bank') {
     showBloodBankPortal(false);
+  } else if (window.location.hash === '#medical-shops') {
+    if (typeof showMedicalShopPortal === 'function') {
+      showMedicalShopPortal(false);
+    }
   } else {
     if (bloodBankPortal) bloodBankPortal.hidden = true;
-    const initialMainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
+    const medPortal = document.getElementById('medicalShopPortal');
+    if (medPortal) medPortal.hidden = true;
+    const initialMainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal):not(#medicalShopPortal)');
     initialMainSections.forEach(s => (s.hidden = false));
   }
 
@@ -3109,6 +3179,13 @@
     document.body.style.overflow = 'hidden';
 
     // 1. Auto-fill Requester Details if user is authenticated
+    if (!currentUser && authToken) {
+      try {
+        const meRes = await apiRequest('/auth/me');
+        if (meRes.data) currentUser = meRes.data;
+      } catch (e) {}
+    }
+
     if (currentUser) {
       if (bloodRequesterName) {
         bloodRequesterName.value = currentUser.name || '';
@@ -3306,6 +3383,10 @@
 
                     <div style="font-size: 0.88rem; margin-top: 3px;">
                       🩸 Blood: <strong style="color: #be123c;">${escapeHtml(bGroup)} (${escapeHtml(bComp)})</strong> &nbsp;|&nbsp; 📦 Quantity: <strong>${bQty} Units</strong>
+                    </div>
+
+                    <div style="font-size: 0.82rem; color: #1e40af; margin-top: 3px;">
+                      👤 Requested By: <strong>${escapeHtml(r.requester?.name || currentUser?.name || 'Citizen Requester')}</strong> (${escapeHtml(r.requester?.relationshipToPatient || 'Friend')})
                     </div>
 
                     <div style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">
@@ -3612,7 +3693,7 @@
                 </div>
 
                 <div style="font-size: 0.82rem; color: #1e40af; background: #eff6ff; padding: 4px 8px; border-radius: 4px; border: 1px solid #dbeafe; display: inline-block; margin-top: 4px;">
-                  📞 Requester: <strong>${escapeHtml(reqName)}</strong> (${escapeHtml(reqRelation)}) &middot; Contact: <strong>${escapeHtml(reqContact)}</strong>
+                  👤 Requested By: <strong>${escapeHtml(reqName)}</strong> (${escapeHtml(reqRelation)}) &middot; Contact: <strong>${escapeHtml(reqContact)}</strong>
                 </div>
               </div>
               <button type="button" class="btn btn-outline btn-xs view-blood-detail-btn" data-id="${r._id}">View Details</button>
@@ -4104,6 +4185,340 @@
         fetchBloodBankStatistics();
       });
     } catch (e) {}
+  }
+
+
+  /* =====================================================
+     16. 24×7 MEDICAL SHOP MODULE
+     State-Wide Verified 24×7 Pharmacies, Proximity Sorting,
+     Live MongoDB Atlas Data, Dynamic Google Maps Directions
+     ===================================================== */
+
+  const medicalShopPortal = document.getElementById('medicalShopPortal');
+  const navMedicalShopBtn = document.getElementById('navMedicalShopBtn');
+  const navMedicalShopLink = document.getElementById('navMedicalShopLink');
+  const mobileMedicalShopBtn = document.getElementById('mobileMedicalShopBtn');
+  const heroMedicalShopBtn = document.getElementById('heroMedicalShopBtn');
+  const pharmacyNearMeHeroBtn = document.getElementById('pharmacyNearMeHeroBtn');
+  const returnToBedTrackerFromPharmacyBtn = document.getElementById('returnToBedTrackerFromPharmacyBtn');
+
+  const pharmacySearchForm = document.getElementById('pharmacySearchForm');
+  const pharmacySearchInput = document.getElementById('pharmacySearchInput');
+  const pharmacyDistrictSelect = document.getElementById('pharmacyDistrictSelect');
+  const pharmacyOnly24x7Check = document.getElementById('pharmacyOnly24x7Check');
+  const pharmacyNearMeBtn = document.getElementById('pharmacyNearMeBtn');
+  const pharmacyResetSearchBtn = document.getElementById('pharmacyResetSearchBtn');
+  const pharmacyEmptyResetBtn = document.getElementById('pharmacyEmptyResetBtn');
+
+  const pharmacyCardsGrid = document.getElementById('pharmacyCardsGrid');
+  const pharmacyLoadingBox = document.getElementById('pharmacyLoadingBox');
+  const pharmacyAlertBox = document.getElementById('pharmacyAlertBox');
+  const pharmacyEmptyState = document.getElementById('pharmacyEmptyState');
+  const pharmacyResultsMeta = document.getElementById('pharmacyResultsMeta');
+  const statTotalPharmacies = document.getElementById('statTotalPharmacies');
+
+  let cachedMedicalShops = [];
+  let pharmacyUserLocation = null;
+  let isFetchingPharmacies = false;
+
+  // Populate District Dropdown for Medical Shops
+  if (pharmacyDistrictSelect && pharmacyDistrictSelect.options.length <= 1 && typeof DISTRICTS !== 'undefined') {
+    DISTRICTS.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.textContent = d;
+      pharmacyDistrictSelect.appendChild(opt);
+    });
+  }
+
+  /**
+   * Generates dynamic Google Maps direction or search URL
+   */
+  function buildDynamicMapsUrl(shop) {
+    if (shop.directionsUrl && shop.directionsUrl.startsWith('http')) {
+      return shop.directionsUrl;
+    }
+    if (shop.googleMapsUrl && shop.googleMapsUrl.startsWith('http')) {
+      return shop.googleMapsUrl;
+    }
+    if (shop.latitude != null && shop.longitude != null && !isNaN(shop.latitude) && !isNaN(shop.longitude)) {
+      return `https://www.google.com/maps/search/?api=1&query=${shop.latitude},${shop.longitude}`;
+    }
+    const parts = [shop.name, shop.address, shop.area, shop.city, shop.district, 'West Bengal']
+      .filter(Boolean)
+      .join(', ');
+    if (parts.trim()) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.trim())}`;
+    }
+    return null;
+  }
+
+  /**
+   * Render pharmacy cards list
+   */
+  function renderMedicalShopCards(shops) {
+    if (!pharmacyCardsGrid) return;
+    pharmacyCardsGrid.innerHTML = '';
+
+    if (!Array.isArray(shops) || shops.length === 0) {
+      if (pharmacyEmptyState) pharmacyEmptyState.hidden = false;
+      if (pharmacyResultsMeta) pharmacyResultsMeta.textContent = 'Showing 0 verified 24×7 pharmacies';
+      return;
+    }
+
+    if (pharmacyEmptyState) pharmacyEmptyState.hidden = true;
+    if (pharmacyResultsMeta) {
+      pharmacyResultsMeta.textContent = `Showing ${shops.length} verified 24×7 ${shops.length === 1 ? 'pharmacy' : 'pharmacies'} in West Bengal`;
+    }
+
+    shops.forEach(shop => {
+      const card = document.createElement('div');
+      card.className = 'pharmacy-card';
+      card.setAttribute('data-shop-id', shop._id || '');
+
+      const mapsUrl = buildDynamicMapsUrl(shop);
+      const is24x7 = shop.is24x7 !== false;
+      const distanceBadge = (shop.distance != null && !isNaN(shop.distance))
+        ? `<div class="pharmacy-dist-badge">📍 ~${shop.distance} km away</div>`
+        : '';
+
+      const phoneLink = shop.phone
+        ? `<a href="tel:${escapeHtml(shop.phone)}" class="pharmacy-phone-link">${escapeHtml(shop.phone)}</a>`
+        : 'Contact unavailable';
+
+      const altPhone = shop.alternatePhone
+        ? ` <span style="color: var(--muted); font-size: 0.8rem;">/ <a href="tel:${escapeHtml(shop.alternatePhone)}" class="pharmacy-phone-link">${escapeHtml(shop.alternatePhone)}</a></span>`
+        : '';
+
+      const mapsBtnHtml = mapsUrl
+        ? `<a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="btn-maps" aria-label="Get directions to ${escapeHtml(shop.name)} on Google Maps">
+             <span>🗺️</span> Open in Google Maps
+           </a>`
+        : `<button type="button" class="btn-maps btn-disabled" disabled aria-disabled="true">
+             <span>📍</span> Location unavailable
+           </button>`;
+
+      card.innerHTML = `
+        <div>
+          <div class="pharmacy-card-head">
+            <h3 class="pharmacy-card-title">${escapeHtml(shop.name)}</h3>
+            ${is24x7 ? `<span class="pharmacy-24x7-badge"><span>🕐</span> Open 24×7</span>` : ''}
+          </div>
+          <div class="pharmacy-card-body">
+            <div class="pharmacy-info-row">
+              <span class="row-icon">📍</span>
+              <div>
+                <strong>${escapeHtml(shop.area || shop.city || '')}</strong> · ${escapeHtml(shop.district || 'West Bengal')}
+                <div style="font-size: 0.82rem; color: var(--muted); margin-top: 2px;">${escapeHtml(shop.address || '')}${shop.landmark ? ` (Near ${escapeHtml(shop.landmark)})` : ''}</div>
+                ${distanceBadge}
+              </div>
+            </div>
+            <div class="pharmacy-info-row" style="margin-top: 10px;">
+              <span class="row-icon">📞</span>
+              <div>
+                ${phoneLink}${altPhone}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pharmacy-card-footer">
+          ${mapsBtnHtml}
+        </div>
+      `;
+
+      pharmacyCardsGrid.appendChild(card);
+    });
+  }
+
+  /**
+   * Fetch medical shops from backend API
+   */
+  async function fetchMedicalShops(customFilters = {}) {
+    if (isFetchingPharmacies) return;
+    isFetchingPharmacies = true;
+
+    if (pharmacyLoadingBox) pharmacyLoadingBox.hidden = false;
+    if (pharmacyAlertBox) pharmacyAlertBox.hidden = true;
+    if (pharmacyEmptyState) pharmacyEmptyState.hidden = true;
+    if (pharmacyCardsGrid) pharmacyCardsGrid.innerHTML = '';
+
+    try {
+      const params = new URLSearchParams();
+
+      const searchVal = customFilters.search !== undefined
+        ? customFilters.search
+        : (pharmacySearchInput ? pharmacySearchInput.value.trim() : '');
+      if (searchVal) params.append('search', searchVal);
+
+      const districtVal = customFilters.district !== undefined
+        ? customFilters.district
+        : (pharmacyDistrictSelect ? pharmacyDistrictSelect.value : 'all');
+      if (districtVal && districtVal !== 'all') params.append('district', districtVal);
+
+      const is24x7Val = customFilters.is24x7 !== undefined
+        ? customFilters.is24x7
+        : (pharmacyOnly24x7Check ? pharmacyOnly24x7Check.checked : true);
+      if (is24x7Val) params.append('is24x7', 'true');
+
+      // Geolocation
+      const userLoc = customFilters.coords || pharmacyUserLocation || userGeoLocation;
+      if (userLoc && userLoc.latitude != null && userLoc.longitude != null) {
+        params.append('latitude', String(userLoc.latitude));
+        params.append('longitude', String(userLoc.longitude));
+      }
+
+      params.append('limit', '60');
+
+      const url = `/medical-shops?${params.toString()}`;
+      const res = await apiRequest(url);
+
+      if (res && res.success && Array.isArray(res.medicalShops)) {
+        cachedMedicalShops = res.medicalShops;
+        renderMedicalShopCards(cachedMedicalShops);
+        if (statTotalPharmacies && res.count) {
+          statTotalPharmacies.textContent = `${res.count}+`;
+        }
+      } else {
+        cachedMedicalShops = [];
+        renderMedicalShopCards([]);
+      }
+    } catch (err) {
+      console.error('Error fetching medical shops:', err);
+      if (pharmacyAlertBox) {
+        pharmacyAlertBox.hidden = false;
+        pharmacyAlertBox.textContent = `⚠️ ${formatErrorMessage(err) || 'Unable to load 24×7 medical shops right now. Please try again.'}`;
+      }
+      if (pharmacyCardsGrid) pharmacyCardsGrid.innerHTML = '';
+      if (pharmacyEmptyState) pharmacyEmptyState.hidden = true;
+    } finally {
+      if (pharmacyLoadingBox) pharmacyLoadingBox.hidden = true;
+      isFetchingPharmacies = false;
+    }
+  }
+
+  /**
+   * Show Medical Shop Portal (hiding homepage and Blood Bank Portal)
+   */
+  function showMedicalShopPortal(updateHistory = true) {
+    if (!medicalShopPortal) return;
+    if (bloodBankPortal) bloodBankPortal.hidden = true;
+
+    const mainSections = document.querySelectorAll('#main-content > section:not(#medicalShopPortal)');
+    mainSections.forEach(s => (s.hidden = true));
+    medicalShopPortal.hidden = false;
+
+    window.scrollTo({ top: 0, left: 0 });
+
+    if (mobileMenu && mobileMenu.classList.contains('open')) {
+      mobileMenu.classList.remove('open');
+      if (hamburgerBtn) hamburgerBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (updateHistory && window.location.hash !== '#medical-shops') {
+      history.pushState({ view: 'medical-shops' }, '', '#medical-shops');
+    }
+
+    fetchMedicalShops();
+  }
+
+  // Make available globally for hash navigation sync
+  window.showMedicalShopPortal = showMedicalShopPortal;
+
+  // Wire up Medical Shop Portal buttons
+  [navMedicalShopBtn, navMedicalShopLink, mobileMedicalShopBtn, heroMedicalShopBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showMedicalShopPortal(true);
+      });
+    }
+  });
+
+  if (returnToBedTrackerFromPharmacyBtn) {
+    returnToBedTrackerFromPharmacyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToOriginalHome(true);
+    });
+  }
+
+  // Search form submission
+  if (pharmacySearchForm) {
+    pharmacySearchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      fetchMedicalShops();
+    });
+  }
+
+  // Filter dropdown change
+  if (pharmacyDistrictSelect) {
+    pharmacyDistrictSelect.addEventListener('change', () => {
+      fetchMedicalShops();
+    });
+  }
+
+  // 24x7 Checkbox toggle
+  if (pharmacyOnly24x7Check) {
+    pharmacyOnly24x7Check.addEventListener('change', () => {
+      fetchMedicalShops();
+    });
+  }
+
+  // Reset filters
+  function resetPharmacyFilters() {
+    if (pharmacySearchInput) pharmacySearchInput.value = '';
+    if (pharmacyDistrictSelect) pharmacyDistrictSelect.value = 'all';
+    if (pharmacyOnly24x7Check) pharmacyOnly24x7Check.checked = true;
+    pharmacyUserLocation = null;
+    fetchMedicalShops();
+  }
+
+  if (pharmacyResetSearchBtn) {
+    pharmacyResetSearchBtn.addEventListener('click', resetPharmacyFilters);
+  }
+  if (pharmacyEmptyResetBtn) {
+    pharmacyEmptyResetBtn.addEventListener('click', resetPharmacyFilters);
+  }
+
+  // Near Me / Geolocation Proximity button
+  function requestPharmacyNearMe() {
+    if (!navigator.geolocation) {
+      showToast('Geolocation is not supported by your browser');
+      return;
+    }
+
+    showToast('📍 Getting your current location for nearest pharmacies...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        pharmacyUserLocation = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
+        userGeoLocation = pharmacyUserLocation;
+        showToast('📍 Location detected! Sorting 24×7 pharmacies by proximity.');
+        fetchMedicalShops({ coords: pharmacyUserLocation });
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        showToast('⚠️ Location access was denied or unavailable. Showing all statewide 24×7 pharmacies.');
+        fetchMedicalShops();
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  }
+
+  if (pharmacyNearMeBtn) {
+    pharmacyNearMeBtn.addEventListener('click', requestPharmacyNearMe);
+  }
+  if (pharmacyNearMeHeroBtn) {
+    pharmacyNearMeHeroBtn.addEventListener('click', () => {
+      showMedicalShopPortal(true);
+      requestPharmacyNearMe();
+    });
+  }
+
+  // Check initial hash on load for #medical-shops
+  if (window.location.hash === '#medical-shops') {
+    showMedicalShopPortal(false);
   }
 
 })();

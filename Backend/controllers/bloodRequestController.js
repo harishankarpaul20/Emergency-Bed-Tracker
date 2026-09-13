@@ -86,20 +86,29 @@ const createBloodRequest = async (req, res, next) => {
       return res.status(422).json({ success: false, message: 'Patient full name is required.' });
     }
 
-    // 2. Resolve Requester Details (the authenticated user or guest submitter)
-    let defaultUserId = req.user ? req.user._id : undefined;
-    if (!defaultUserId) {
+    // 2. Resolve Requester Details (The person who actually submitted the request)
+    // CRITICAL: When the request is made by an authenticated user (req.user is set via JWT token),
+    // we MUST determine the requester on the backend directly from req.user to ensure identity integrity.
+    let resolvedUserId = req.user ? req.user._id : undefined;
+    if (!resolvedUserId) {
       const fallbackAdmin = await User.findOne({ role: 'super_admin' }).lean();
-      defaultUserId = fallbackAdmin ? fallbackAdmin._id : undefined;
+      resolvedUserId = fallbackAdmin ? fallbackAdmin._id : undefined;
     }
 
     const isSelf = (requesterInput?.relationshipToPatient || relationshipToPatient) === 'Self';
-    const fallbackRequesterName = req.user ? req.user.name : (isSelf ? resolvedPatient.name : 'Citizen Requester');
+
     const resolvedRequester = {
-      user: req.user ? req.user._id : defaultUserId,
-      name: (requesterInput?.name || requesterName || fallbackRequesterName).trim(),
-      contact: (requesterInput?.contact || requesterContact || (req.user ? (req.user.phone || req.user.email) : (isSelf ? resolvedPatient.contactPhone : '')) || '').trim(),
-      role: (requesterInput?.role || requesterRole || (req.user ? req.user.role.toUpperCase() : 'USER')),
+      user: req.user ? req.user._id : resolvedUserId,
+      userId: req.user ? req.user._id : resolvedUserId,
+      name: req.user
+        ? req.user.name
+        : (requesterInput?.name || requesterName || (isSelf ? resolvedPatient.name : 'Citizen Requester')).trim(),
+      contact: req.user
+        ? (req.user.phone || req.user.email || requesterInput?.contact || '')
+        : (requesterInput?.contact || requesterContact || (isSelf ? resolvedPatient.contactPhone : '')).trim(),
+      role: req.user
+        ? (req.user.role ? req.user.role.toUpperCase() : 'USER')
+        : (requesterInput?.role || requesterRole || 'USER').toUpperCase(),
       relationshipToPatient: requesterInput?.relationshipToPatient || relationshipToPatient || (isSelf || (req.user && req.user.name === resolvedPatient.name) ? 'Self' : 'Friend'),
     };
 
@@ -160,6 +169,7 @@ const createBloodRequest = async (req, res, next) => {
       .populate('fulfillingHospital', 'name district area phone')
       .populate('sourceHospital', 'name district phone')
       .populate('requester.user', 'name email phone role')
+      .populate('requester.userId', 'name email phone role')
       .populate('patient.emergencyIntake')
       .populate('patient.referral')
       .lean();
@@ -230,7 +240,10 @@ const getBloodRequests = async (req, res, next) => {
 
     // Role filtering & hospital isolation
     if (req.user.role === 'user') {
-      filter['requester.user'] = req.user._id;
+      filter.$or = [
+        { 'requester.user': req.user._id },
+        { 'requester.userId': req.user._id },
+      ];
     } else if (['hospital_admin', 'blood_bank_staff', 'doctor'].includes(req.user.role)) {
       const userHosp = req.user.hospital?._id ? req.user.hospital._id.toString() : (req.user.hospital?.toString() || req.user.hospitalId);
       if (!userHosp) {
@@ -255,6 +268,7 @@ const getBloodRequests = async (req, res, next) => {
       .populate('fulfillingHospital', 'name district area phone')
       .populate('sourceHospital', 'name district phone')
       .populate('requester.user', 'name email phone')
+      .populate('requester.userId', 'name email phone')
       .populate('patient.emergencyIntake')
       .populate('patient.referral')
       .sort({ 'bloodRequirement.urgency': 1, createdAt: -1 })
@@ -287,6 +301,7 @@ const getBloodRequestById = async (req, res, next) => {
       .populate('fulfillingHospital', 'name district area phone address')
       .populate('sourceHospital', 'name district phone address')
       .populate('requester.user', 'name email phone')
+      .populate('requester.userId', 'name email phone')
       .populate('patient.emergencyIntake')
       .populate('patient.referral')
       .lean();
@@ -311,7 +326,10 @@ const getBloodRequestById = async (req, res, next) => {
  */
 const getMyBloodRequests = async (req, res, next) => {
   try {
-    const orConditions = [{ 'requester.user': req.user._id }];
+    const orConditions = [
+      { 'requester.user': req.user._id },
+      { 'requester.userId': req.user._id },
+    ];
     if (req.user.phone && String(req.user.phone).trim()) {
       const p = String(req.user.phone).trim();
       orConditions.push({ 'patient.contactPhone': p });
@@ -327,6 +345,8 @@ const getMyBloodRequests = async (req, res, next) => {
     const requests = await BloodRequest.find({ $or: orConditions })
       .populate('recipients.hospital', 'name district area phone')
       .populate('fulfillingHospital', 'name district phone')
+      .populate('requester.user', 'name email phone')
+      .populate('requester.userId', 'name email phone')
       .sort({ createdAt: -1 })
       .lean();
 

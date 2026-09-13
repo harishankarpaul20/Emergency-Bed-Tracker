@@ -43,12 +43,16 @@
       <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
       <a href="#blood-bank" id="navBloodBankLink">🩸 Blood Bank</a>
+      <a href="#medical-shops" id="navMedicalShopLink">💊 24×7 Medical Shop</a>
       <a href="#staff-portal" id="navStaffPortalBtn" class="nav-staff-link">🔐 Staff Portal</a>
     </nav>
 
     <div class="navbar-actions">
       <a href="#blood-bank" class="btn btn-blood btn-sm" id="navBloodBankBtn" aria-label="Open Blood Bank Portal">
         🩸 <span>Blood Bank</span>
+      </a>
+      <a href="#medical-shops" class="btn btn-pharmacy btn-sm" id="navMedicalShopBtn" aria-label="Open 24×7 Medical Shop Portal">
+        💊 <span>24×7 Medical Shop</span>
       </a>
       <a href="tel:112" class="btn btn-emergency btn-sm" aria-label="Call emergency number 112">
         🚨 <span>Emergency 112</span>
@@ -63,6 +67,7 @@
     <a href="#main-content" id="mobileHomeBtn">Home</a>
     <a href="#find-beds">Find Beds</a>
     <a href="#blood-bank" id="mobileBloodBankBtn" style="color: #e11d48; font-weight: 700;">🩸 Blood Bank Portal</a>
+    <a href="#medical-shops" id="mobileMedicalShopBtn" style="color: #059669; font-weight: 700;">💊 24×7 Medical Shop</a>
     <a href="#hospitals">Hospitals</a>
     <a href="#emergency-patient-intake">Patient Intake</a>
     <a href="#map-section">Map</a>
@@ -317,6 +322,136 @@
     </div>
   </section>
 
+  <!-- ================= 2.6 24x7 MEDICAL SHOP PORTAL ================= -->
+  <section class="medical-shop-portal" id="medicalShopPortal" hidden aria-labelledby="medicalShopPortalHeading">
+    <div class="pharmacy-portal-hero">
+      <div class="pharmacy-hero-inner">
+        <div class="pharmacy-badge-tag">
+          <span>💊</span> 24×7 Emergency Pharmacy Network · West Bengal
+        </div>
+        <h1 id="medicalShopPortalHeading">24×7 Medical Shops</h1>
+        <p class="pharmacy-hero-sub">
+          Find nearby pharmacies that are available 24×7.
+        </p>
+
+        <!-- LIVE STATEWIDE PHARMACY METRICS -->
+        <div class="pharmacy-stats-grid" id="pharmacyPortalMetrics">
+          <div class="pharmacy-stat-card">
+            <span class="pharmacy-stat-icon">💊</span>
+            <div class="pharmacy-stat-info">
+              <span class="pharmacy-stat-num" id="statTotalPharmacies">16+</span>
+              <span class="pharmacy-stat-lbl">Verified 24×7 Pharmacies</span>
+            </div>
+          </div>
+          <div class="pharmacy-stat-card">
+            <span class="pharmacy-stat-icon">🕐</span>
+            <div class="pharmacy-stat-info">
+              <span class="pharmacy-stat-num">24 Hours</span>
+              <span class="pharmacy-stat-lbl">Always Open</span>
+            </div>
+          </div>
+          <div class="pharmacy-stat-card">
+            <span class="pharmacy-stat-icon">🗺️</span>
+            <div class="pharmacy-stat-info">
+              <span class="pharmacy-stat-num" id="statPharmacyDistricts">Statewide</span>
+              <span class="pharmacy-stat-lbl">Districts Covered</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUICK ACTION BAR -->
+        <div class="pharmacy-actions-row">
+          <button type="button" class="btn btn-pharmacy btn-lg" id="pharmacyNearMeHeroBtn">
+            📍 Find Nearest 24×7 Pharmacy
+          </button>
+          <button type="button" class="btn btn-ghost-white" id="returnToBedTrackerFromPharmacyBtn">
+            🏥 Back to Bed Tracker
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEARCH & FILTER MODULE -->
+    <div class="section-inner" style="padding-top: 36px;">
+      <div class="pharmacy-search-card">
+        <div class="pharmacy-search-head">
+          <h2 style="font-size: 1.35rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span>🔍</span> Search 24×7 Medical Shops
+          </h2>
+          <p style="font-size: 0.85rem; color: var(--muted); margin: 4px 0 0;">
+            Filter pharmacies by district, area, name or proximity
+          </p>
+        </div>
+
+        <form id="pharmacySearchForm" class="pharmacy-search-form" role="search" novalidate>
+          <div class="pharmacy-form-grid">
+            <div class="form-group" style="flex: 2; min-width: 240px;">
+              <label for="pharmacySearchInput">Search by Name, Area or Landmark</label>
+              <input type="text" id="pharmacySearchInput" class="form-control" placeholder="e.g. Apollo, Frank Ross, Salt Lake, Gariahat, Park Street...">
+            </div>
+
+            <div class="form-group" style="flex: 1.5; min-width: 200px;">
+              <label for="pharmacyDistrictSelect">District</label>
+              <select id="pharmacyDistrictSelect" class="form-control">
+                <option value="all">All Districts (West Bengal)</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="flex: 1; min-width: 160px; display: flex; flex-direction: column; justify-content: flex-end;">
+              <label class="pharmacy-checkbox-label">
+                <input type="checkbox" id="pharmacyOnly24x7Check" checked>
+                <span>🕐 Open 24×7 Only</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="pharmacy-filter-actions">
+            <button type="submit" class="btn btn-pharmacy" id="pharmacySearchSubmitBtn">
+              🔍 SEARCH PHARMACIES
+            </button>
+            <button type="button" class="btn btn-outline" id="pharmacyNearMeBtn">
+              📍 Use My Location
+            </button>
+            <button type="button" class="btn btn-outline" id="pharmacyResetSearchBtn">
+              RESET FILTERS
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- RESULTS HEADER -->
+      <div class="pharmacy-results-header" style="margin-top: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3 id="pharmacyResultsTitle" style="margin: 0; font-size: 1.25rem;">Verified 24×7 Medical Shops</h3>
+          <p id="pharmacyResultsMeta" style="margin: 2px 0 0; font-size: 0.84rem; color: var(--muted);">Showing verified 24×7 pharmacies in West Bengal</p>
+        </div>
+      </div>
+
+      <!-- LOADING STATE -->
+      <div class="pharmacy-loading-box" id="pharmacyLoadingBox" hidden style="text-align: center; padding: 48px 16px;">
+        <div class="intake-spinner" aria-hidden="true" style="margin: 0 auto 16px;"></div>
+        <p style="font-size: 1.05rem; font-weight: 600; color: var(--secondary);">Finding 24×7 medical shops...</p>
+      </div>
+
+      <!-- ERROR ALERT -->
+      <div class="pharmacy-alert-box alert-danger" id="pharmacyAlertBox" hidden role="alert" style="margin-top: 16px; padding: 14px 18px; border-radius: 8px; font-weight: 600;">
+        ⚠️ Unable to load medical shops right now. Please try again.
+      </div>
+
+      <!-- MEDICAL SHOPS CARD GRID -->
+      <div class="pharmacy-cards-grid" id="pharmacyCardsGrid" style="margin-top: 20px;"></div>
+
+      <!-- EMPTY STATE -->
+      <div class="pharmacy-empty-state" id="pharmacyEmptyState" hidden style="text-align: center; padding: 60px 16px;">
+        <span style="font-size: 3rem; display: block; margin-bottom: 12px;">💊</span>
+        <h4 style="font-size: 1.2rem; margin: 0 0 8px;">No 24×7 medical shops found</h4>
+        <p style="font-size: 0.9rem; color: var(--muted); max-width: 480px; margin: 0 auto 20px;">
+          We could not find any 24×7 medical shops matching your search filters. Try selecting a different district or clearing your search term.
+        </p>
+        <button type="button" class="btn btn-outline" id="pharmacyEmptyResetBtn">VIEW ALL 24×7 MEDICAL SHOPS</button>
+      </div>
+    </div>
+  </section>
 
   <!-- ================= 3. HERO ================= -->
   <section class="hero" aria-labelledby="hero-heading">
@@ -340,6 +475,12 @@
           <button class="btn btn-ghost" id="useLocationBtn" type="button">
             <span aria-hidden="true">📍</span> Use My Location
           </button>
+          <a href="#blood-bank" class="btn btn-outline hero-action-btn" id="heroBloodBankBtn" style="border-color: #e11d48; color: #be123c; font-weight: 700;">
+            🩸 Blood Bank
+          </a>
+          <a href="#medical-shops" class="btn btn-outline hero-action-btn" id="heroMedicalShopBtn" style="border-color: #059669; color: #047857; font-weight: 700;">
+            💊 24×7 Medical Shop
+          </a>
         </div>
 
         <p class="disclaimer-inline">Demo platform • Bed availability must be confirmed directly with the hospital.</p>

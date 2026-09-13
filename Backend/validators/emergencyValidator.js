@@ -66,6 +66,7 @@ const emergencyIntakeRules = [
     .trim()
     .notEmpty()
     .withMessage('Contact number is required')
+    .customSanitizer(val => typeof val === 'string' ? val.replace(/[\s\-\(\)]/g, '').replace(/^(\+91|0)/, '') : val)
     .matches(/^[6-9]\d{9}$/)
     .withMessage('Contact number must be a valid 10-digit Indian mobile number'),
 

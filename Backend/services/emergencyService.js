@@ -325,6 +325,7 @@ async function processEmergencyIntake(intakeData) {
   }));
 
   // Create persistent intake record
+  console.log("ABOUT TO SAVE");
   const intakeRecord = await EmergencyIntake.create({
     patientName: intakeData.patientName.trim(),
     age: Number(intakeData.age),
