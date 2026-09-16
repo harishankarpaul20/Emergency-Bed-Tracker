@@ -169,64 +169,186 @@ button { font-family: inherit; }
   position: sticky;
   top: 0;
   z-index: 500;
-  background: rgba(255,255,255,0.94);
-  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 .navbar-inner {
-  max-width: var(--content-width);
+  max-width: 1440px;
+  width: 100%;
   margin: 0 auto;
   height: var(--nav-height);
-  padding: 0 24px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark { font-size: 1.5rem; }
-.brand-text-wrap { display: flex; flex-direction: column; line-height: 1.15; }
-.brand-text { font-weight: 800; font-size: 1.02rem; color: var(--secondary); }
+
+/* 2.1 LOGO AREA */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  flex-shrink: 0;
+  min-width: fit-content;
+}
+.brand-mark {
+  font-size: 1.55rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.brand-text-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.brand-text {
+  font-weight: 800;
+  font-size: 0.98rem;
+  color: var(--secondary);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
 .brand-subtitle {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--primary);
   font-weight: 700;
+  margin-top: 1px;
 }
 
-.nav-links { display: flex; gap: 26px; align-items: center; }
-.nav-links a { font-weight: 600; font-size: 0.9rem; color: var(--muted); padding: 6px 2px; border-bottom: 2px solid transparent; }
-.nav-links a:hover { color: var(--secondary); border-color: var(--primary); }
+/* 2.2 NAVIGATION LINKS */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 1;
+}
+.nav-links a {
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: var(--muted);
+  padding: 8px 4px;
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.nav-links a:hover {
+  color: var(--secondary);
+  border-color: var(--primary);
+}
+.nav-links a.nav-staff-link {
+  color: #475569;
+}
+.nav-links a.nav-staff-link:hover {
+  color: var(--secondary);
+}
 
-.navbar-actions { display: flex; align-items: center; gap: 14px; }
+/* 2.3 ACTION BUTTONS AREA */
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.navbar-actions .btn {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 13px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.navbar-actions .btn span {
+  display: inline;
+}
 
+/* 2.4 HAMBURGER TOGGLE BUTTON */
 .hamburger {
   display: none;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   gap: 5px;
-  width: 40px; height: 40px;
-  background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.hamburger span { display: block; width: 18px; height: 2px; background: var(--secondary); margin: 0 auto; transition: transform 0.2s ease, opacity 0.2s ease; }
+.hamburger:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.hamburger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--secondary);
+  margin: 0 auto;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  border-radius: 1px;
+}
 .hamburger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .hamburger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
 .hamburger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
+/* 2.5 MOBILE DRAWER MENU */
 .mobile-menu {
   display: none;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 24px 20px;
+  gap: 2px;
+  padding: 12px 20px 24px;
   border-top: 1px solid var(--border);
   background: var(--card);
+  box-shadow: var(--shadow-md);
+  max-height: calc(100vh - var(--nav-height) - var(--top-bar-height));
+  overflow-y: auto;
 }
-.mobile-menu a { padding: 12px 6px; font-weight: 600; border-radius: var(--radius-sm); }
-.mobile-menu a:hover { background: var(--bg); }
-.mobile-menu.open { display: flex; }
+.mobile-menu a {
+  padding: 11px 12px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--secondary);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.mobile-menu a:hover {
+  background: var(--bg);
+  color: var(--primary);
+}
+.mobile-menu.open {
+  display: flex;
+}
 
 /* =========================================================
    3. HERO
@@ -697,6 +819,68 @@ button { font-family: inherit; }
 .reveal.is-visible { opacity: 1; transform: translateY(0); }
 
 /* =========================================================
+   RESPONSIVE — HEADER & NAVIGATION BREAKPOINTS
+   ========================================================= */
+/* Large desktop: tighten nav link gap and font size slightly */
+@media (max-width: 1360px) {
+  .nav-links { gap: 10px; }
+  .nav-links a { font-size: 0.82rem; padding: 6px 3px; }
+  .navbar-actions { gap: 6px; }
+  .navbar-actions .btn { padding: 0 10px; font-size: 0.78rem; }
+}
+
+/* Standard desktop: compact action buttons to icon-first with concise text */
+@media (max-width: 1200px) {
+  .nav-links { gap: 8px; }
+  .nav-links a { font-size: 0.8rem; padding: 5px 2px; }
+  .brand-text { font-size: 0.94rem; }
+  .navbar-actions .btn { padding: 0 9px; font-size: 0.76rem; }
+}
+
+/* Small desktop / tablet-landscape: transition seamlessly to clean hamburger drawer */
+@media (max-width: 1080px) {
+  .nav-links { display: none !important; }
+  .hamburger { display: flex !important; }
+  .navbar-actions { gap: 8px; }
+  .navbar-actions .btn { min-height: 36px; height: 36px; padding: 0 12px; font-size: 0.8rem; }
+  .navbar-actions .btn-blood span,
+  .navbar-actions .btn-pharmacy span { display: inline; }
+}
+
+/* Tablet portrait: condense button labels to keep layout compact and balanced */
+@media (max-width: 768px) {
+  .navbar-inner { padding: 0 16px; gap: 10px; }
+  .brand-mark { font-size: 1.4rem; }
+  .brand-text { font-size: 0.9rem; }
+  .brand-subtitle { font-size: 0.6rem; }
+  .navbar-actions { gap: 6px; }
+  .navbar-actions .btn { padding: 0 9px; font-size: 0.76rem; }
+}
+
+/* Mobile: show icons with emergency button compact and hamburger menu */
+@media (max-width: 580px) {
+  .navbar-inner { padding: 0 12px; gap: 8px; }
+  .brand-text-wrap { line-height: 1.1; }
+  .brand-text { font-size: 0.84rem; }
+  .brand-subtitle { display: none; }
+  .navbar-actions .btn-blood span,
+  .navbar-actions .btn-pharmacy span { display: none; }
+  .navbar-actions .btn-blood,
+  .navbar-actions .btn-pharmacy { padding: 0 9px; min-width: 36px; }
+  .navbar-actions .btn-emergency { padding: 0 10px; font-size: 0.76rem; }
+}
+
+/* Very narrow mobile: 360px - 390px */
+@media (max-width: 400px) {
+  .navbar-inner { padding: 0 8px; gap: 6px; }
+  .brand-text { font-size: 0.78rem; }
+  .navbar-actions { gap: 4px; }
+  .navbar-actions .btn-emergency span { display: none; }
+  .navbar-actions .btn-emergency { padding: 0 8px; min-width: 34px; }
+  .hamburger { width: 34px; height: 34px; min-height: 34px; }
+}
+
+/* =========================================================
    RESPONSIVE — TABLET
    ========================================================= */
 @media (max-width: 1024px) {
@@ -715,11 +899,6 @@ button { font-family: inherit; }
    RESPONSIVE — MOBILE
    ========================================================= */
 @media (max-width: 720px) {
-  .nav-links { display: none; }
-  .hamburger { display: flex; }
-  .navbar-actions .btn-emergency span { display: none; }
-  .navbar-actions .btn-emergency { padding: 9px 12px; }
-
   .top-emergency-inner { font-size: 0.74rem; flex-wrap: wrap; }
 
   .section-inner { padding: 42px 18px; }
