@@ -318,7 +318,98 @@ button { font-family: inherit; }
 .hamburger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
 .hamburger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-/* 2.5 MOBILE DRAWER MENU */
+/* 2.5 DEDICATED WHITE EMERGENCY ACTION STRIP (BELOW NAVIGATION) */
+.navbar-emergency-strip {
+  background: #ffffff;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid #fee2e2;
+  padding: 8px 0;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.05);
+  position: relative;
+}
+.navbar-emergency-strip-inner {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.emergency-strip-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.emergency-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dc2626;
+  box-shadow: 0 0 0 rgba(220, 38, 38, 0.6);
+  animation: emergencyPulse 2s infinite;
+  flex-shrink: 0;
+}
+@keyframes emergencyPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+.emergency-strip-title {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: #991b1b;
+  letter-spacing: -0.01em;
+}
+.emergency-strip-desc {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.emergency-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.emergency-strip-actions .btn {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.emergency-action-cta {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+  transition: all 0.2s ease;
+}
+.emergency-action-cta:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
+  transform: translateY(-1px);
+}
+.emergency-call-112-btn {
+  background: #ffffff;
+  color: #dc2626 !important;
+  border: 1.5px solid #f87171;
+  font-weight: 800;
+}
+.emergency-call-112-btn:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+/* 2.6 MOBILE DRAWER MENU */
 .mobile-menu {
   display: none;
   flex-direction: column;
@@ -835,6 +926,7 @@ button { font-family: inherit; }
   .nav-links a { font-size: 0.8rem; padding: 5px 2px; }
   .brand-text { font-size: 0.94rem; }
   .navbar-actions .btn { padding: 0 9px; font-size: 0.76rem; }
+  .emergency-strip-desc { display: none; }
 }
 
 /* Small desktop / tablet-landscape: transition seamlessly to clean hamburger drawer */
@@ -845,21 +937,29 @@ button { font-family: inherit; }
   .navbar-actions .btn { min-height: 36px; height: 36px; padding: 0 12px; font-size: 0.8rem; }
   .navbar-actions .btn-blood span,
   .navbar-actions .btn-pharmacy span { display: inline; }
+  .emergency-strip-desc { display: none; }
 }
 
 /* Tablet portrait: condense button labels to keep layout compact and balanced */
 @media (max-width: 768px) {
   .navbar-inner { padding: 0 16px; gap: 10px; }
+  .navbar-emergency-strip-inner { padding: 0 16px; gap: 10px; flex-wrap: wrap; }
   .brand-mark { font-size: 1.4rem; }
   .brand-text { font-size: 0.9rem; }
   .brand-subtitle { font-size: 0.6rem; }
   .navbar-actions { gap: 6px; }
   .navbar-actions .btn { padding: 0 9px; font-size: 0.76rem; }
+  .emergency-strip-title { font-size: 0.82rem; }
+  .emergency-strip-actions .btn { height: 34px; min-height: 34px; padding: 0 12px; font-size: 0.76rem; }
 }
 
 /* Mobile: show icons with emergency button compact and hamburger menu */
 @media (max-width: 580px) {
   .navbar-inner { padding: 0 12px; gap: 8px; }
+  .navbar-emergency-strip-inner { padding: 0 12px; gap: 8px; flex-direction: column; align-items: stretch; text-align: center; }
+  .emergency-strip-info { justify-content: center; }
+  .emergency-strip-actions { justify-content: center; width: 100%; }
+  .emergency-strip-actions .btn { flex: 1; justify-content: center; }
   .brand-text-wrap { line-height: 1.1; }
   .brand-text { font-size: 0.84rem; }
   .brand-subtitle { display: none; }
@@ -867,17 +967,17 @@ button { font-family: inherit; }
   .navbar-actions .btn-pharmacy span { display: none; }
   .navbar-actions .btn-blood,
   .navbar-actions .btn-pharmacy { padding: 0 9px; min-width: 36px; }
-  .navbar-actions .btn-emergency { padding: 0 10px; font-size: 0.76rem; }
 }
 
 /* Very narrow mobile: 360px - 390px */
 @media (max-width: 400px) {
   .navbar-inner { padding: 0 8px; gap: 6px; }
+  .navbar-emergency-strip-inner { padding: 0 8px; gap: 6px; }
   .brand-text { font-size: 0.78rem; }
   .navbar-actions { gap: 4px; }
-  .navbar-actions .btn-emergency span { display: none; }
-  .navbar-actions .btn-emergency { padding: 0 8px; min-width: 34px; }
   .hamburger { width: 34px; height: 34px; min-height: 34px; }
+  .emergency-strip-actions { flex-direction: column; }
+  .emergency-strip-actions .btn { width: 100%; }
 }
 
 /* =========================================================

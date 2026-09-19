@@ -42,8 +42,8 @@
       <a href="#map-section">Map</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
-      <a href="#blood-bank" id="navBloodBankLink">🩸 Blood Bank</a>
-      <a href="#medical-shops" id="navMedicalShopLink">💊 24×7 Medical Shop</a>
+      <a href="#blood-bank" id="navBloodBankLink" class="nav-blood-link">🩸 Blood Bank</a>
+      <a href="#medical-shops" id="navMedicalShopLink" class="nav-medical-link">💊 24×7 Medical Shop</a>
       <a href="#staff-portal" id="navStaffPortalBtn" class="nav-staff-link">🔐 Staff Portal</a>
     </nav>
 
@@ -54,12 +54,28 @@
       <a href="#medical-shops" class="btn btn-pharmacy btn-sm" id="navMedicalShopBtn" aria-label="Open 24×7 Medical Shop Portal">
         💊 <span>24×7 Medical Shop</span>
       </a>
-      <a href="tel:112" class="btn btn-emergency btn-sm" aria-label="Call emergency number 112">
-        🚨 <span>Emergency 112</span>
-      </a>
       <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <span></span><span></span><span></span>
       </button>
+    </div>
+  </div>
+
+  <!-- Dedicated White Emergency CTA Action Strip below Main Navigation -->
+  <div class="navbar-emergency-strip" id="navEmergencyStrip">
+    <div class="navbar-emergency-strip-inner">
+      <div class="emergency-strip-info">
+        <span class="emergency-pulse-dot" aria-hidden="true"></span>
+        <span class="emergency-strip-title">🚨 24×7 Emergency Medical Assistance</span>
+        <span class="emergency-strip-desc">Immediate triage &amp; priority matching for acute medical emergencies</span>
+      </div>
+      <div class="emergency-strip-actions">
+        <a href="#emergency-patient-intake" class="btn btn-emergency btn-sm emergency-action-cta" id="headerEmergencyActionBtn">
+          🚨 <span>EMERGENCY INTAKE &amp; ASSISTANCE</span>
+        </a>
+        <a href="tel:112" class="btn btn-emergency-alt btn-sm emergency-call-112-btn" id="headerCall112Btn" aria-label="Call emergency number 112">
+          📞 <span>CALL 112</span>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -74,7 +90,8 @@
     <a href="#how-it-works">How It Works</a>
     <a href="#about">About</a>
     <a href="#staff-portal" id="mobileStaffPortalBtn">🔐 Staff Portal</a>
-    <a href="tel:112" class="btn btn-emergency btn-block">🚨 Emergency 112</a>
+    <a href="#emergency-patient-intake" class="btn btn-emergency btn-block" id="mobileEmergencyActionBtn" style="margin-top: 6px;">🚨 Emergency Intake Form</a>
+    <a href="tel:112" class="btn btn-emergency-alt btn-block" style="margin-top: 4px;">📞 Call Hotline 112</a>
   </div>
 </header>
 

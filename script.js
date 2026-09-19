@@ -2863,6 +2863,32 @@
     });
   });
 
+  // C2) Header Emergency Action Buttons (Desktop Strip & Mobile Menu)
+  const headerEmergencyActionBtn = document.getElementById('headerEmergencyActionBtn');
+  const mobileEmergencyActionBtn = document.getElementById('mobileEmergencyActionBtn');
+  [headerEmergencyActionBtn, mobileEmergencyActionBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const medPortal = document.getElementById('medicalShopPortal');
+        const isBloodActive = bloodBankPortal && !bloodBankPortal.hidden;
+        const isMedActive = medPortal && !medPortal.hidden;
+        if (isBloodActive || isMedActive) {
+          navigateToOriginalHome(true, '#emergency-patient-intake');
+        } else {
+          const intakeSec = document.getElementById('emergency-patient-intake');
+          if (intakeSec) {
+            intakeSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (mobileMenu && mobileMenu.classList.contains('open')) {
+              mobileMenu.classList.remove('open');
+              if (hamburgerBtn) hamburgerBtn.setAttribute('aria-expanded', 'false');
+            }
+          }
+        }
+      });
+    }
+  });
+
   // D) "Home" navigation links (Desktop, Mobile menu, Footer, and #main-content links)
   document.querySelectorAll('#navHomeLink, #mobileHomeBtn, #footerHomeLink, a[href="#main-content"]').forEach(link => {
     link.addEventListener('click', (e) => {

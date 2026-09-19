@@ -122,7 +122,7 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
-// Rate Limiting
+// Rate Limiting 
 const generalLimiter = rateLimit({
   windowMs: (parseInt(process.env.RATE_LIMIT_WINDOW_MINUTES, 10) || 15) * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 300,
@@ -176,9 +176,8 @@ app.use('/api/bed-requests', bedRequestRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/referrals', referralRoutes);
-app.use('/api/blood-banks', bloodBankRoutes);
 app.use('/api/blood-bank', bloodBankRoutes);
-app.use('/api/blood-availability', bloodBankRoutes);
+app.use('/api/blood-banks', bloodBankRoutes);
 app.use('/api/blood-inventory', bloodBankRoutes);
 app.use('/api/blood-requests', bloodRequestRoutes);
 app.use('/api/donors', donorRoutes);
