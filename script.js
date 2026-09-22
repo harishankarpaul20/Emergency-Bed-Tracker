@@ -4832,8 +4832,17 @@
   // Toggle Chatbot Open/Close
   function toggleRakshakChat(forceOpen = null) {
     if (!rakshakChatWidget) return;
-    const shouldOpen = forceOpen !== null ? forceOpen : rakshakChatWidget.hidden;
-    rakshakChatWidget.hidden = !shouldOpen;
+    const isCurrentlyHidden = rakshakChatWidget.hidden || rakshakChatWidget.style.display === 'none';
+    const shouldOpen = forceOpen !== null ? forceOpen : isCurrentlyHidden;
+
+    if (shouldOpen) {
+      rakshakChatWidget.hidden = false;
+      rakshakChatWidget.style.display = 'flex';
+    } else {
+      rakshakChatWidget.hidden = true;
+      rakshakChatWidget.style.display = 'none';
+    }
+
     if (rakshakLauncherBtn) {
       rakshakLauncherBtn.setAttribute('aria-expanded', String(shouldOpen));
     }
@@ -4847,10 +4856,17 @@
   }
 
   if (rakshakLauncherBtn) {
-    rakshakLauncherBtn.addEventListener('click', () => toggleRakshakChat());
+    rakshakLauncherBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleRakshakChat();
+    });
   }
   if (rakshakCloseBtn) {
-    rakshakCloseBtn.addEventListener('click', () => toggleRakshakChat(false));
+    rakshakCloseBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleRakshakChat(false);
+    });
   }
 
   // Auto-resize input textarea
