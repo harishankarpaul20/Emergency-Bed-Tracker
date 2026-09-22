@@ -742,18 +742,29 @@
     document.body.style.overflow = 'hidden';
     populateStaffHospitalDropdown();
 
+    if (authToken) {
+      if (checkStaffSessionTimeout()) {
+        renderStaffLoginForm();
+        return;
+      }
+    }
+
     if (authToken && currentUser) {
+      resetStaffInactivityTimer();
       renderStaffDashboard();
     } else if (authToken) {
       // Validate existing token
       apiRequest('/auth/me')
         .then(res => {
           currentUser = res.data;
+          resetStaffInactivityTimer();
           renderStaffDashboard();
         })
         .catch(() => {
           authToken = '';
+          currentUser = null;
           localStorage.removeItem('medbed_auth_token');
+          localStorage.removeItem('medbed_staff_last_active');
           renderStaffLoginForm();
         });
     } else {
@@ -1085,6 +1096,90 @@
     });
   }
 
+  /* -----------------------------------------------------
+     12.1 STAFF INACTIVITY SESSION TIMEOUT (15 MINUTES)
+     ----------------------------------------------------- */
+  const STAFF_SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+  let staffInactivityTimer = null;
+
+  function updateStaffLastActivity() {
+    const now = Date.now();
+    localStorage.setItem('medbed_staff_last_active', String(now));
+  }
+
+  function getStaffLastActivity() {
+    const val = localStorage.getItem('medbed_staff_last_active');
+    return val ? parseInt(val, 10) : 0;
+  }
+
+  function resetStaffInactivityTimer() {
+    if (staffInactivityTimer) {
+      clearTimeout(staffInactivityTimer);
+      staffInactivityTimer = null;
+    }
+
+    if (!authToken) {
+      return;
+    }
+
+    updateStaffLastActivity();
+
+    staffInactivityTimer = setTimeout(() => {
+      checkStaffSessionTimeout();
+    }, STAFF_SESSION_TIMEOUT_MS);
+  }
+
+  function checkStaffSessionTimeout() {
+    if (!authToken) return false;
+
+    const lastActive = getStaffLastActivity();
+    const elapsed = Date.now() - lastActive;
+
+    if (elapsed >= STAFF_SESSION_TIMEOUT_MS) {
+      handleStaffInactivityLogout();
+      return true;
+    } else {
+      const remaining = STAFF_SESSION_TIMEOUT_MS - elapsed;
+      if (staffInactivityTimer) clearTimeout(staffInactivityTimer);
+      staffInactivityTimer = setTimeout(() => {
+        checkStaffSessionTimeout();
+      }, remaining);
+      return false;
+    }
+  }
+
+  function handleStaffInactivityLogout() {
+    if (staffInactivityTimer) {
+      clearTimeout(staffInactivityTimer);
+      staffInactivityTimer = null;
+    }
+
+    authToken = '';
+    currentUser = null;
+    localStorage.removeItem('medbed_auth_token');
+    localStorage.removeItem('medbed_staff_last_active');
+
+    // Ensure staff login form is rendered
+    renderStaffLoginForm();
+
+    // Show exact required expiration notification
+    showToast('Your session expired due to inactivity. Please log in again.', 5000);
+  }
+
+  // Register user interaction listeners to keep active session alive
+  const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+  ACTIVITY_EVENTS.forEach(evt => {
+    window.addEventListener(evt, () => {
+      if (authToken) {
+        const lastActive = getStaffLastActivity();
+        // Throttle updates to at most once every 3 seconds to avoid unnecessary overhead
+        if (Date.now() - lastActive > 3000) {
+          resetStaffInactivityTimer();
+        }
+      }
+    }, { passive: true });
+  });
+
   // Staff Login Submission
   staffLoginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1109,6 +1204,7 @@
       authToken = res.data.token;
       currentUser = res.data.user;
       localStorage.setItem('medbed_auth_token', authToken);
+      resetStaffInactivityTimer();
 
       showToast(`👋 Welcome, ${currentUser.name}!`);
       renderStaffDashboard();
@@ -1121,9 +1217,14 @@
   });
 
   staffLogoutBtn.addEventListener('click', () => {
+    if (staffInactivityTimer) {
+      clearTimeout(staffInactivityTimer);
+      staffInactivityTimer = null;
+    }
     authToken = '';
     currentUser = null;
     localStorage.removeItem('medbed_auth_token');
+    localStorage.removeItem('medbed_staff_last_active');
     showToast('Logged out of Staff Portal.');
     renderStaffLoginForm();
   });
@@ -1428,15 +1529,35 @@
 
     // Restore authenticated session if token exists
     if (authToken && !currentUser) {
-      apiRequest('/auth/me')
-        .then(res => {
-          if (res.data) currentUser = res.data;
-        })
-        .catch(() => {
-          authToken = '';
-          currentUser = null;
-          localStorage.removeItem('medbed_auth_token');
-        });
+      if (checkStaffSessionTimeout()) {
+        authToken = '';
+        currentUser = null;
+        localStorage.removeItem('medbed_auth_token');
+        localStorage.removeItem('medbed_staff_last_active');
+      } else {
+        apiRequest('/auth/me')
+          .then(res => {
+            if (res.data) {
+              currentUser = res.data;
+              resetStaffInactivityTimer();
+            }
+          })
+          .catch(() => {
+            authToken = '';
+            currentUser = null;
+            localStorage.removeItem('medbed_auth_token');
+            localStorage.removeItem('medbed_staff_last_active');
+          });
+      }
+    } else if (authToken && currentUser) {
+      if (checkStaffSessionTimeout()) {
+        authToken = '';
+        currentUser = null;
+        localStorage.removeItem('medbed_auth_token');
+        localStorage.removeItem('medbed_staff_last_active');
+      } else {
+        resetStaffInactivityTimer();
+      }
     }
 
     // Initialize Emergency Patient Intake feature
