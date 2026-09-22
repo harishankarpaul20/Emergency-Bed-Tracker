@@ -4668,5 +4668,831 @@
     showMedicalShopPortal(false);
   }
 
+  /* -----------------------------------------------------
+     16. DR. RAKSHAK — AI HEALTH ASSISTANT (FEATURES #1–#15)
+     ----------------------------------------------------- */
+
+  // Chat State & Conversation Management
+  let chatMessages = [];
+  let chatState = 'IDLE'; // 'IDLE' | 'PROCESSING' | 'TYPING' | 'COMPLETED' | 'ERROR'
+  let currentConversationGeneration = 1;
+  let activeTypingTimer = null;
+  let activeTypingMessageId = null;
+  let activeTypingFullText = '';
+
+  // DOM Elements
+  const rakshakLauncherBtn = document.getElementById('rakshakLauncherBtn');
+  const rakshakChatWidget = document.getElementById('rakshakChatWidget');
+  const rakshakCloseBtn = document.getElementById('rakshakCloseBtn');
+  const rakshakNewChatBtn = document.getElementById('rakshakNewChatBtn');
+  const rakshakChatBody = document.getElementById('rakshakChatBody');
+  const rakshakWelcomeView = document.getElementById('rakshakWelcomeView');
+  const rakshakMessagesList = document.getElementById('rakshakMessagesList');
+  const rakshakInputForm = document.getElementById('rakshakInputForm');
+  const rakshakChatInput = document.getElementById('rakshakChatInput');
+  const rakshakStopBtn = document.getElementById('rakshakStopBtn');
+  const rakshakSendBtn = document.getElementById('rakshakSendBtn');
+  const rakshakOfflineBanner = document.getElementById('rakshakOfflineBanner');
+  const rakshakResetModalOverlay = document.getElementById('rakshakResetModalOverlay');
+  const rakshakResetCancelBtn = document.getElementById('rakshakResetCancelBtn');
+  const rakshakResetConfirmBtn = document.getElementById('rakshakResetConfirmBtn');
+  const rakshakQuickActions = document.getElementById('rakshakQuickActions');
+  const rakshakSuggestedQuestions = document.getElementById('rakshakSuggestedQuestions');
+
+  // Helper: Format message timestamp (Feature #14)
+  function getFormattedTimestamp() {
+    try {
+      return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch (e) {
+      const d = new Date();
+      return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+  }
+
+  // Helper: Safe Lightweight Markdown to HTML Renderer
+  function renderMarkdownToHtml(markdown) {
+    if (!markdown) return '';
+    let text = String(markdown);
+
+    // Escape HTML entities to prevent XSS
+    text = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Fenced Code Blocks (```lang ... ```)
+    text = text.replace(/```(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, (match, code) => {
+      return `<pre><code>${code.trim()}</code></pre>`;
+    });
+
+    // Inline Code (`code`)
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Headings (###, ##, #)
+    text = text.replace(/^### (.*$)/gim, '<h4 style="margin:6px 0 4px;font-size:0.95rem;font-weight:700;">$1</h4>');
+    text = text.replace(/^## (.*$)/gim, '<h3 style="margin:8px 0 4px;font-size:1rem;font-weight:700;">$1</h3>');
+    text = text.replace(/^# (.*$)/gim, '<h3 style="margin:10px 0 4px;font-size:1.05rem;font-weight:800;">$1</h3>');
+
+    // Blockquotes (> quote)
+    text = text.replace(/^>\s?(.*$)/gim, '<blockquote>$1</blockquote>');
+
+    // Tables (| col | col |)
+    if (text.includes('|')) {
+      const lines = text.split('\n');
+      let inTable = false;
+      let tableHtml = '';
+      const newLines = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('|') && line.endsWith('|')) {
+          const cells = line.split('|').map(c => c.trim()).slice(1, -1);
+          if (cells.every(c => /^[-:]+$/.test(c))) {
+            // separator line
+            continue;
+          }
+          if (!inTable) {
+            inTable = true;
+            tableHtml = '<table><thead><tr>' + cells.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+          } else {
+            tableHtml += '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+          }
+        } else {
+          if (inTable) {
+            tableHtml += '</tbody></table>';
+            newLines.push(tableHtml);
+            inTable = false;
+            tableHtml = '';
+          }
+          newLines.push(lines[i]);
+        }
+      }
+      if (inTable) {
+        tableHtml += '</tbody></table>';
+        newLines.push(tableHtml);
+      }
+      text = newLines.join('\n');
+    }
+
+    // Bold (**text** or __text__)
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+    // Italic (*text* or _text_)
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+    // Links ([text](url))
+    text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // Lists (unordered - or *, ordered 1.)
+    const paragraphs = text.split(/\n\n+/);
+    const renderedParagraphs = paragraphs.map(para => {
+      const lines = para.split('\n');
+      if (lines.every(l => l.trim().startsWith('- ') || l.trim().startsWith('* '))) {
+        return '<ul>' + lines.map(l => `<li>${l.replace(/^[-*]\s+/, '')}</li>`).join('') + '</ul>';
+      }
+      if (lines.every(l => /^\d+\.\s+/.test(l.trim()))) {
+        return '<ol>' + lines.map(l => `<li>${l.replace(/^\d+\.\s+/, '')}</li>`).join('') + '</ol>';
+      }
+      return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+    });
+
+    return renderedParagraphs.join('');
+  }
+
+  // Helper: Extract clean text for clipboard (Feature #7)
+  function getCleanMessageText(content) {
+    if (!content) return '';
+    return String(content).trim();
+  }
+
+  // Online / Offline State Listener (Feature #13)
+  function updateOnlineStatus() {
+    const isOnline = navigator.onLine;
+    if (rakshakOfflineBanner) {
+      rakshakOfflineBanner.hidden = isOnline;
+    }
+  }
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+
+  // Scroll Chat to Bottom
+  function scrollChatToBottom(smooth = true) {
+    if (!rakshakChatBody) return;
+    requestAnimationFrame(() => {
+      rakshakChatBody.scrollTo({
+        top: rakshakChatBody.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    });
+  }
+
+  // Toggle Chatbot Open/Close
+  function toggleRakshakChat(forceOpen = null) {
+    if (!rakshakChatWidget) return;
+    const shouldOpen = forceOpen !== null ? forceOpen : rakshakChatWidget.hidden;
+    rakshakChatWidget.hidden = !shouldOpen;
+    if (rakshakLauncherBtn) {
+      rakshakLauncherBtn.setAttribute('aria-expanded', String(shouldOpen));
+    }
+    if (shouldOpen) {
+      updateOnlineStatus();
+      scrollChatToBottom(false);
+      setTimeout(() => {
+        if (rakshakChatInput) rakshakChatInput.focus();
+      }, 100);
+    }
+  }
+
+  if (rakshakLauncherBtn) {
+    rakshakLauncherBtn.addEventListener('click', () => toggleRakshakChat());
+  }
+  if (rakshakCloseBtn) {
+    rakshakCloseBtn.addEventListener('click', () => toggleRakshakChat(false));
+  }
+
+  // Auto-resize input textarea
+  if (rakshakChatInput) {
+    rakshakChatInput.addEventListener('input', () => {
+      rakshakChatInput.style.height = 'auto';
+      const newHeight = Math.min(rakshakChatInput.scrollHeight, 90);
+      rakshakChatInput.style.height = `${newHeight}px`;
+    });
+
+    rakshakChatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        rakshakInputForm.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    });
+  }
+
+  // Render Full Messages List into DOM
+  function renderChatMessages() {
+    if (!rakshakMessagesList || !rakshakWelcomeView) return;
+
+    if (chatMessages.length === 0) {
+      rakshakWelcomeView.hidden = false;
+      rakshakMessagesList.innerHTML = '';
+      return;
+    }
+
+    rakshakWelcomeView.hidden = true;
+    rakshakMessagesList.innerHTML = '';
+
+    chatMessages.forEach((msg) => {
+      const row = document.createElement('div');
+      row.className = `chat-msg-row ${msg.role === 'user' ? 'user-row' : 'assistant-row'}`;
+      row.id = `chat-msg-row-${msg.id}`;
+
+      if (msg.role === 'user') {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-msg-user';
+        bubble.textContent = msg.content;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'chat-msg-time';
+        timeSpan.textContent = msg.timestamp;
+
+        row.appendChild(bubble);
+        row.appendChild(timeSpan);
+      } else {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-msg-assistant';
+        bubble.id = `chat-bubble-${msg.id}`;
+
+        if (msg.isNew) {
+          bubble.classList.add('animate-entrance');
+          msg.isNew = false;
+        }
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'ai-msg-content';
+        contentDiv.id = `chat-content-${msg.id}`;
+
+        if (msg.status === 'processing') {
+          // Feature #1 & #2: Blinking eye placeholder during processing
+          contentDiv.innerHTML = `
+            <div class="ai-processing-placeholder" role="status" aria-label="Dr. Rakshak is generating a response">
+              <span class="ai-blinking-eye" aria-hidden="true">👁️</span>
+              <span class="ai-processing-text">Dr. Rakshak is analyzing...</span>
+            </div>
+          `;
+        } else if (msg.status === 'typing') {
+          // Feature #3: Typing state with live caret cursor
+          contentDiv.innerHTML = renderMarkdownToHtml(msg.visibleContent || '') + '<span class="ai-typing-cursor" aria-hidden="true">|</span>';
+        } else if (msg.status === 'error') {
+          // Feature #13: Safe error and retry state
+          contentDiv.innerHTML = `
+            <div class="chat-error-card" role="alert">
+              <div class="chat-error-row">
+                <span class="chat-error-icon" aria-hidden="true">⚠️</span>
+                <span class="chat-error-text">${escapeHtml(msg.errorMessage || 'Unable to connect to the AI service. Please try again.')}</span>
+              </div>
+              <button type="button" class="chat-retry-btn" data-action="retry" data-id="${msg.id}" aria-label="Retry sending request">
+                <span>🔄</span> Retry
+              </button>
+            </div>
+          `;
+        } else {
+          // Completed State: Render full markdown
+          contentDiv.innerHTML = renderMarkdownToHtml(msg.content);
+        }
+
+        bubble.appendChild(contentDiv);
+
+        // Actions toolbar on completed assistant messages (Features #7, #8, #9)
+        if (msg.status === 'completed') {
+          const actionsBar = document.createElement('div');
+          actionsBar.className = 'chat-msg-actions';
+
+          // Copy Button (Feature #7)
+          const copyBtn = document.createElement('button');
+          copyBtn.type = 'button';
+          copyBtn.className = 'chat-action-btn';
+          copyBtn.setAttribute('data-action', 'copy');
+          copyBtn.setAttribute('data-id', msg.id);
+          copyBtn.setAttribute('aria-label', 'Copy AI response');
+          copyBtn.innerHTML = msg.copied ? '<span>✓</span> Copied' : '<span>📋</span> Copy';
+          if (msg.copied) copyBtn.classList.add('copied-success');
+
+          // Regenerate Button (Feature #8)
+          const regenBtn = document.createElement('button');
+          regenBtn.type = 'button';
+          regenBtn.className = 'chat-action-btn';
+          regenBtn.setAttribute('data-action', 'regenerate');
+          regenBtn.setAttribute('data-id', msg.id);
+          regenBtn.setAttribute('aria-label', 'Regenerate AI response');
+          regenBtn.innerHTML = '<span>🔄</span> Regenerate';
+
+          // Helpful 👍 Feedback (Feature #9)
+          const helpfulBtn = document.createElement('button');
+          helpfulBtn.type = 'button';
+          helpfulBtn.className = `chat-action-btn ${msg.feedback === 'helpful' ? 'active-helpful' : ''}`;
+          helpfulBtn.setAttribute('data-action', 'feedback-helpful');
+          helpfulBtn.setAttribute('data-id', msg.id);
+          helpfulBtn.setAttribute('aria-label', 'Mark response as helpful');
+          helpfulBtn.innerHTML = '👍 Helpful';
+
+          // Not Helpful 👎 Feedback (Feature #9)
+          const notHelpfulBtn = document.createElement('button');
+          notHelpfulBtn.type = 'button';
+          notHelpfulBtn.className = `chat-action-btn ${msg.feedback === 'not_helpful' ? 'active-not-helpful' : ''}`;
+          notHelpfulBtn.setAttribute('data-action', 'feedback-not-helpful');
+          notHelpfulBtn.setAttribute('data-id', msg.id);
+          notHelpfulBtn.setAttribute('aria-label', 'Mark response as not helpful');
+          notHelpfulBtn.innerHTML = '👎 Not helpful';
+
+          actionsBar.appendChild(copyBtn);
+          actionsBar.appendChild(regenBtn);
+          actionsBar.appendChild(helpfulBtn);
+          actionsBar.appendChild(notHelpfulBtn);
+          bubble.appendChild(actionsBar);
+        }
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'chat-msg-time';
+        timeSpan.textContent = msg.timestamp;
+
+        row.appendChild(bubble);
+        row.appendChild(timeSpan);
+      }
+
+      rakshakMessagesList.appendChild(row);
+    });
+
+    scrollChatToBottom();
+  }
+
+  // Feature #4: Natural AI Response Typing Reveal & Caret Animation
+  function startNaturalTyping(messageId, fullText, generation) {
+    if (currentConversationGeneration !== generation) return;
+
+    const msg = chatMessages.find(m => m.id === messageId);
+    if (!msg) return;
+
+    msg.status = 'typing';
+    msg.visibleContent = '';
+    chatState = 'TYPING';
+    activeTypingMessageId = messageId;
+    activeTypingFullText = fullText;
+
+    if (rakshakStopBtn) rakshakStopBtn.hidden = false;
+    if (rakshakSendBtn) rakshakSendBtn.disabled = true;
+
+    // Determine character reveal speed based on length to keep UX fast and responsive
+    const totalLength = fullText.length;
+    const isLong = totalLength > 350;
+    const chunkSize = isLong ? Math.max(3, Math.floor(totalLength / 90)) : 1;
+
+    let currentIndex = 0;
+
+    function stepTyping() {
+      if (currentConversationGeneration !== generation || chatState !== 'TYPING' || activeTypingMessageId !== messageId) {
+        return;
+      }
+
+      currentIndex = Math.min(currentIndex + chunkSize, totalLength);
+      const visibleChunk = fullText.slice(0, currentIndex);
+      msg.visibleContent = visibleChunk;
+
+      const contentEl = document.getElementById(`chat-content-${messageId}`);
+      if (contentEl) {
+        contentEl.innerHTML = renderMarkdownToHtml(visibleChunk) + '<span class="ai-typing-cursor" aria-hidden="true">|</span>';
+        scrollChatToBottom();
+      }
+
+      if (currentIndex >= totalLength) {
+        completeTyping(messageId, fullText);
+      } else {
+        const nextChar = fullText[currentIndex - 1] || '';
+        let delay = 18;
+        if (['.', '!', '?', '\n'].includes(nextChar)) {
+          delay = 90;
+        } else if ([',', ';', ':'].includes(nextChar)) {
+          delay = 50;
+        }
+        activeTypingTimer = setTimeout(stepTyping, delay);
+      }
+    }
+
+    stepTyping();
+  }
+
+  // Feature #6: Complete or Stop Typing immediately
+  function completeTyping(messageId, fullText) {
+    if (activeTypingTimer) {
+      clearTimeout(activeTypingTimer);
+      activeTypingTimer = null;
+    }
+
+    const msg = chatMessages.find(m => m.id === messageId);
+    if (msg) {
+      msg.content = fullText;
+      msg.visibleContent = fullText;
+      msg.status = 'completed';
+    }
+
+    chatState = 'COMPLETED';
+    activeTypingMessageId = null;
+    activeTypingFullText = '';
+
+    if (rakshakStopBtn) rakshakStopBtn.hidden = true;
+    if (rakshakSendBtn) rakshakSendBtn.disabled = false;
+    if (rakshakChatInput) rakshakChatInput.disabled = false;
+
+    renderChatMessages();
+  }
+
+  // Feature #6: Stop / Skip AI response typing handler
+  if (rakshakStopBtn) {
+    rakshakStopBtn.addEventListener('click', () => {
+      if (activeTypingMessageId && activeTypingFullText) {
+        completeTyping(activeTypingMessageId, activeTypingFullText);
+      }
+    });
+  }
+
+  // Safe Mock Response Generator (Development Fallback before backend /api/chat is added)
+  function generateSafeMockResponse(query) {
+    const q = (query || '').toLowerCase();
+
+    if (q.includes('icu') || q.includes('ventilator')) {
+      const availHospitals = hospitals.filter(h => (h.icuBeds || 0) > 0);
+      let listStr = availHospitals.slice(0, 4).map((h, i) =>
+        `${i + 1}. **${h.name}** (${h.district})\n   - Available ICU Beds: **${h.icuBeds}**\n   - Ventilators: **${h.ventilators || 0}**\n   - Contact: ${h.phone || '033-2320-3040'}`
+      ).join('\n\n');
+
+      return `I found verified hospitals in West Bengal with available **ICU Beds**:\n\n${listStr}\n\n*Please confirm real-time admission directly with the hospital emergency desk.*`;
+    }
+
+    if (q.includes('blood') || q.includes('donor') || q.includes('platelet')) {
+      return `### 🩸 Emergency Blood Services — West Bengal\n\nYou can access verified blood banks and statewide emergency blood services:\n\n1. **BloodConnect Portal**: Search active inventory across all 23 districts.\n2. **Emergency Broadcast**: Dispatch requests to multiple hospital blood banks simultaneously.\n3. **Volunteer Donor Network**: Alert registered matching ABO/Rh donors.\n\nClick the **Blood Bank** tab in the navigation or use the quick action chip below to view current stock.`;
+    }
+
+    if (q.includes('medical') || q.includes('shop') || q.includes('pharmacy') || q.includes('medicine')) {
+      return `### 💊 24×7 Emergency Medical Shops\n\nWest Bengal provides verified all-night pharmacies equipped with emergency medications, injectables, and oxygen cylinders:\n\n- **Kolkata & Suburbs**: 24/7 hospital pharmacies and verified private dispensaries.\n- **Districts**: Sub-divisional medical shops with emergency supplies.\n\nUse the **24×7 Medical Shop** section to search by district or find the nearest pharmacy via GPS proximity.`;
+    }
+
+    if (q.includes('intake') || q.includes('referral') || q.includes('transfer') || q.includes('admission')) {
+      return `### 📋 Emergency Patient Intake & Triage\n\nFor acute admissions and emergency triage:\n\n1. Use the **Patient Intake Form** on this platform to initiate emergency pre-registration.\n2. Clinicians can create verified **Inter-Hospital Referrals** with complete clinical handoff parameters (vitals, diagnosis, blood/ICU requirements).\n3. Hospital staff can track real-time transfer readiness across West Bengal facilities.`;
+    }
+
+    if (q.includes('ambulance') || q.includes('112') || q.includes('emergency')) {
+      return `### 🚨 Immediate Emergency Protocol\n\n- **National Emergency Hotline**: Call **112** or **102** immediately for ambulance dispatch.\n- **Statewide Triage**: Locate the nearest emergency-ready facility with available general and ICU beds.\n\n*Dr. Rakshak is an AI health assistant. For life-threatening acute conditions, contact emergency services without delay.*`;
+    }
+
+    // Default safe assistance response
+    return `Hello! I can assist you with:\n\n- 🛏️ **Hospital Bed Tracking**: General, ICU, and Oxygen bed availability across 23 districts.\n- 🩸 **Blood Services**: Real-time blood bank inventory and emergency broadcast.\n- 💊 **24×7 Medical Shops**: Night pharmacies and emergency medical supplies.\n- 📋 **Patient Intake & Referrals**: Structured emergency handoffs.\n\nHow can I assist you with your healthcare inquiry today?`;
+  }
+
+  // Fetch AI Response (Handles backend API with graceful safe mock fallback)
+  async function fetchAIResponse(query, conversationHistory, generation) {
+    try {
+      const res = await apiRequest('/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: query,
+          history: conversationHistory
+        })
+      });
+
+      if (currentConversationGeneration !== generation) return null;
+
+      if (res && res.data && (res.data.reply || res.data.message)) {
+        return res.data.reply || res.data.message;
+      }
+      if (res && res.message) {
+        return res.message;
+      }
+      return generateSafeMockResponse(query);
+    } catch (err) {
+      if (currentConversationGeneration !== generation) return null;
+
+      // If backend /api/chat is not yet implemented (e.g. 404/405/500), use safe dev mock
+      if (err.status === 404 || err.status === 502 || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        await new Promise(r => setTimeout(r, 600)); // Natural processing simulation
+        if (currentConversationGeneration !== generation) return null;
+        return generateSafeMockResponse(query);
+      }
+
+      // Propagate genuine error
+      throw err;
+    }
+  }
+
+  // Send Chat Message Controller (Features #1, #2, #4, #13, #14)
+  async function sendChatMessage(rawText, options = {}) {
+    const text = (rawText || '').trim();
+    if (!text) return;
+
+    const generation = currentConversationGeneration;
+
+    // Check offline status (Feature #13)
+    if (!navigator.onLine) {
+      const userMsgId = 'usr_' + Date.now();
+      const assistantMsgId = 'ai_' + (Date.now() + 1);
+
+      if (!options.isRegenerate) {
+        chatMessages.push({
+          id: userMsgId,
+          role: 'user',
+          content: text,
+          timestamp: getFormattedTimestamp()
+        });
+      }
+
+      chatMessages.push({
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        timestamp: getFormattedTimestamp(),
+        status: 'error',
+        errorMessage: "You're offline. Check your internet connection and try again.",
+        originalQuery: text,
+        errorStatus: 0
+      });
+
+      chatState = 'ERROR';
+      renderChatMessages();
+      return;
+    }
+
+    let assistantMsgId;
+    let userMsgId;
+
+    if (options.isRegenerate && options.targetMessageId) {
+      // Feature #8: Replace existing assistant message with processing state
+      const targetMsg = chatMessages.find(m => m.id === options.targetMessageId);
+      if (targetMsg) {
+        assistantMsgId = targetMsg.id;
+        targetMsg.status = 'processing';
+        targetMsg.content = '';
+        targetMsg.feedback = null;
+        targetMsg.timestamp = getFormattedTimestamp();
+      } else {
+        assistantMsgId = 'ai_' + Date.now();
+        chatMessages.push({
+          id: assistantMsgId,
+          role: 'assistant',
+          content: '',
+          timestamp: getFormattedTimestamp(),
+          status: 'processing',
+          feedback: null,
+          originalQuery: text,
+          isNew: true
+        });
+      }
+    } else {
+      userMsgId = 'usr_' + Date.now();
+      assistantMsgId = 'ai_' + (Date.now() + 1);
+
+      chatMessages.push({
+        id: userMsgId,
+        role: 'user',
+        content: text,
+        timestamp: getFormattedTimestamp()
+      });
+
+      chatMessages.push({
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        timestamp: getFormattedTimestamp(),
+        status: 'processing',
+        feedback: null,
+        originalQuery: text,
+        isNew: true
+      });
+    }
+
+    chatState = 'PROCESSING';
+    if (rakshakChatInput) {
+      rakshakChatInput.value = '';
+      rakshakChatInput.style.height = 'auto';
+    }
+    if (rakshakSendBtn) rakshakSendBtn.disabled = true;
+
+    renderChatMessages();
+
+    // Prepare conversation context
+    const historyPayload = chatMessages
+      .filter(m => m.status === 'completed')
+      .slice(-6)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    try {
+      const responseText = await fetchAIResponse(text, historyPayload, generation);
+
+      if (currentConversationGeneration !== generation) {
+        // Stale response protection (Section 25 / Feature #12)
+        return;
+      }
+
+      if (!responseText || typeof responseText !== 'string' || !responseText.trim()) {
+        const msg = chatMessages.find(m => m.id === assistantMsgId);
+        if (msg) {
+          msg.status = 'error';
+          msg.errorMessage = 'The AI service returned an empty response. Please retry.';
+        }
+        chatState = 'ERROR';
+        if (rakshakSendBtn) rakshakSendBtn.disabled = false;
+        renderChatMessages();
+        return;
+      }
+
+      const msg = chatMessages.find(m => m.id === assistantMsgId);
+      if (msg) {
+        msg.content = responseText;
+      }
+
+      // Feature #4: Transition from processing eye to natural typing
+      startNaturalTyping(assistantMsgId, responseText, generation);
+
+    } catch (err) {
+      if (currentConversationGeneration !== generation) return;
+
+      const msg = chatMessages.find(m => m.id === assistantMsgId);
+      if (msg) {
+        msg.status = 'error';
+        msg.errorMessage = err.status === 429
+          ? 'Too many requests right now. Please wait a moment and try again.'
+          : (err.status === 503 || err.status === 502
+              ? 'The AI service is temporarily unavailable. Please try again.'
+              : (err.message || 'Unable to connect to the AI service. Please try again.'));
+        msg.errorStatus = err.status || 500;
+      }
+
+      chatState = 'ERROR';
+      if (rakshakSendBtn) rakshakSendBtn.disabled = false;
+      if (rakshakStopBtn) rakshakStopBtn.hidden = true;
+      renderChatMessages();
+    }
+  }
+
+  // Handle Form Submission
+  if (rakshakInputForm) {
+    rakshakInputForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (chatState === 'PROCESSING' || chatState === 'TYPING') return;
+      const val = (rakshakChatInput?.value || '').trim();
+      if (val) {
+        sendChatMessage(val);
+      }
+    });
+  }
+
+  // Feature #11: Suggested Questions click listener
+  if (rakshakSuggestedQuestions) {
+    rakshakSuggestedQuestions.addEventListener('click', (e) => {
+      const chip = e.target.closest('.rakshak-prompt-chip');
+      if (!chip) return;
+      const promptText = chip.getAttribute('data-prompt');
+      if (promptText) {
+        sendChatMessage(promptText);
+      }
+    });
+  }
+
+  // Feature #10: Emergency Quick Actions click listener
+  if (rakshakQuickActions) {
+    rakshakQuickActions.addEventListener('click', (e) => {
+      const chip = e.target.closest('.rakshak-chip-btn');
+      if (!chip) return;
+      const action = chip.getAttribute('data-action');
+
+      if (action === 'find_hospitals') {
+        toggleRakshakChat(false);
+        const findBedsSec = document.getElementById('find-beds');
+        if (findBedsSec) findBedsSec.scrollIntoView({ behavior: 'smooth' });
+      } else if (action === 'find_icu') {
+        toggleRakshakChat(false);
+        if (filterBedType) filterBedType.value = 'icu';
+        searchHospitals();
+        const findBedsSec = document.getElementById('find-beds');
+        if (findBedsSec) findBedsSec.scrollIntoView({ behavior: 'smooth' });
+      } else if (action === 'find_blood') {
+        toggleRakshakChat(false);
+        showBloodBankPortal(false);
+      } else if (action === 'medical_shops') {
+        toggleRakshakChat(false);
+        showMedicalShopPortal(false);
+      } else if (action === 'patient_intake') {
+        toggleRakshakChat(false);
+        const intakeSec = document.getElementById('emergency-patient-intake');
+        if (intakeSec) intakeSec.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
+
+  // Message Actions Event Delegation (Copy, Regenerate, Feedback, Retry)
+  if (rakshakMessagesList) {
+    rakshakMessagesList.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+
+      const action = btn.getAttribute('data-action');
+      const msgId = btn.getAttribute('data-id');
+      const msg = chatMessages.find(m => m.id === msgId);
+      if (!msg) return;
+
+      // Feature #7: Copy AI Response
+      if (action === 'copy') {
+        const textToCopy = getCleanMessageText(msg.content);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textToCopy)
+            .then(() => {
+              msg.copied = true;
+              renderChatMessages();
+              setTimeout(() => {
+                msg.copied = false;
+                renderChatMessages();
+              }, 2000);
+            })
+            .catch(() => {
+              showToast('Copy failed. Please select and copy manually.');
+            });
+        } else {
+          try {
+            const tempTa = document.createElement('textarea');
+            tempTa.value = textToCopy;
+            document.body.appendChild(tempTa);
+            tempTa.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTa);
+            msg.copied = true;
+            renderChatMessages();
+            setTimeout(() => {
+              msg.copied = false;
+              renderChatMessages();
+            }, 2000);
+          } catch (err) {
+            showToast('Copy failed. Please select and copy manually.');
+          }
+        }
+      }
+
+      // Feature #8: Regenerate AI Response
+      else if (action === 'regenerate') {
+        if (chatState === 'PROCESSING' || chatState === 'TYPING') return;
+        sendChatMessage(msg.originalQuery, { isRegenerate: true, targetMessageId: msg.id });
+      }
+
+      // Feature #9: Feedback 👍 Helpful
+      else if (action === 'feedback-helpful') {
+        msg.feedback = msg.feedback === 'helpful' ? null : 'helpful';
+        renderChatMessages();
+      }
+
+      // Feature #9: Feedback 👎 Not Helpful
+      else if (action === 'feedback-not-helpful') {
+        msg.feedback = msg.feedback === 'not_helpful' ? null : 'not_helpful';
+        renderChatMessages();
+      }
+
+      // Feature #13: Retry failed request
+      else if (action === 'retry') {
+        if (chatState === 'PROCESSING' || chatState === 'TYPING') return;
+        // Remove the failed assistant message and resend query
+        chatMessages = chatMessages.filter(m => m.id !== msgId);
+        sendChatMessage(msg.originalQuery, { isRegenerate: true });
+      }
+    });
+  }
+
+  // Feature #12: New Chat / Reset Conversation
+  function triggerNewChat() {
+    if (chatMessages.length === 0) {
+      resetChatState();
+      return;
+    }
+    // Show confirmation modal
+    if (rakshakResetModalOverlay) {
+      rakshakResetModalOverlay.hidden = false;
+    }
+  }
+
+  function resetChatState() {
+    if (activeTypingTimer) {
+      clearTimeout(activeTypingTimer);
+      activeTypingTimer = null;
+    }
+
+    currentConversationGeneration++;
+    chatMessages = [];
+    chatState = 'IDLE';
+    activeTypingMessageId = null;
+    activeTypingFullText = '';
+
+    if (rakshakChatInput) {
+      rakshakChatInput.value = '';
+      rakshakChatInput.style.height = 'auto';
+      rakshakChatInput.disabled = false;
+    }
+    if (rakshakStopBtn) rakshakStopBtn.hidden = true;
+    if (rakshakSendBtn) rakshakSendBtn.disabled = false;
+    if (rakshakResetModalOverlay) rakshakResetModalOverlay.hidden = true;
+
+    renderChatMessages();
+  }
+
+  if (rakshakNewChatBtn) {
+    rakshakNewChatBtn.addEventListener('click', triggerNewChat);
+  }
+  if (rakshakResetCancelBtn) {
+    rakshakResetCancelBtn.addEventListener('click', () => {
+      if (rakshakResetModalOverlay) rakshakResetModalOverlay.hidden = true;
+    });
+  }
+  if (rakshakResetConfirmBtn) {
+    rakshakResetConfirmBtn.addEventListener('click', resetChatState);
+  }
+
+  // Initialize Welcome State
+  renderChatMessages();
+
 })();
+
 

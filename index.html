@@ -2087,6 +2087,189 @@
   </div>
 </div>
 
+<!-- ================= DR. RAKSHAK — AI HEALTH ASSISTANT CHATBOT WIDGET ================= -->
+<!-- Floating Launcher FAB -->
+<button type="button" class="rakshak-launcher-fab" id="rakshakLauncherBtn" aria-label="Open Dr. Rakshak AI Health Assistant" aria-expanded="false" aria-controls="rakshakChatWidget">
+  <span class="rakshak-fab-icon-wrap" aria-hidden="true">
+    <span class="rakshak-fab-icon">🤖</span>
+    <span class="rakshak-fab-pulse"></span>
+  </span>
+  <span class="rakshak-fab-label">
+    <span class="rakshak-fab-name">Dr. Rakshak</span>
+    <span class="rakshak-fab-badge">AI Assistant</span>
+  </span>
+</button>
+
+<!-- Main Chatbot Window -->
+<div class="rakshak-chat-widget" id="rakshakChatWidget" role="dialog" aria-modal="false" aria-labelledby="rakshakHeaderTitle" hidden>
+  <!-- Widget Header -->
+  <div class="rakshak-chat-header">
+    <div class="rakshak-header-brand">
+      <div class="rakshak-avatar" aria-hidden="true">
+        <span class="rakshak-avatar-icon">🤖</span>
+        <span class="rakshak-status-dot" title="AI Assistant Online"></span>
+      </div>
+      <div class="rakshak-header-titles">
+        <div class="rakshak-title-row">
+          <h3 id="rakshakHeaderTitle" class="rakshak-name">Dr. Rakshak</h3>
+          <span class="rakshak-ai-label" aria-label="AI Health Assistant">AI Health Assistant</span>
+        </div>
+        <p class="rakshak-subtitle">Emergency Bed Tracker · West Bengal</p>
+      </div>
+    </div>
+    <div class="rakshak-header-actions">
+      <button type="button" class="rakshak-header-btn" id="rakshakNewChatBtn" title="Start a new chat" aria-label="Start a new chat">
+        <span>＋</span> <span class="rakshak-btn-text">New Chat</span>
+      </button>
+      <button type="button" class="rakshak-header-btn rakshak-close-btn" id="rakshakCloseBtn" title="Close chat window" aria-label="Close Dr. Rakshak chat">
+        ✕
+      </button>
+    </div>
+  </div>
+
+  <!-- Offline Warning Banner -->
+  <div class="rakshak-offline-banner" id="rakshakOfflineBanner" hidden role="status" aria-live="polite">
+    <span class="rakshak-offline-icon" aria-hidden="true">⚠️</span>
+    <span class="rakshak-offline-text">You're currently offline. Check your internet connection.</span>
+  </div>
+
+  <!-- Messages Scroll Container -->
+  <div class="rakshak-chat-body" id="rakshakChatBody" role="log" aria-live="polite" aria-label="Dr. Rakshak conversation history">
+    <!-- Welcome View (Visible initially and upon New Chat reset) -->
+    <div class="rakshak-welcome-view" id="rakshakWelcomeView">
+      <div class="rakshak-welcome-card">
+        <div class="rakshak-welcome-icon-wrap" aria-hidden="true">
+          <span class="rakshak-welcome-icon">🩺</span>
+        </div>
+        <h4 class="rakshak-welcome-title">Welcome to Dr. Rakshak</h4>
+        <p class="rakshak-welcome-desc">
+          Your AI Health Assistant for finding emergency hospital beds, blood services, 24×7 medical shops, and patient triage across West Bengal.
+        </p>
+
+        <!-- Mandatory Medical Safety Label Notice -->
+        <div class="rakshak-safety-notice" role="note">
+          <span class="rakshak-safety-icon" aria-hidden="true">ℹ️</span>
+          <span class="rakshak-safety-text">
+            <strong>Medical Notice:</strong> Dr. Rakshak is an AI health assistant, not a human doctor. For emergencies or serious medical concerns, contact a qualified healthcare professional or emergency service (Call 112).
+          </span>
+        </div>
+
+        <!-- Emergency Quick Actions (Feature #10) -->
+        <div class="rakshak-chips-section">
+          <div class="rakshak-chips-label">
+            <span class="rakshak-label-icon" aria-hidden="true">🚨</span> Emergency Quick Actions
+          </div>
+          <div class="rakshak-quick-actions-grid" id="rakshakQuickActions">
+            <button type="button" class="rakshak-chip-btn rakshak-chip-emergency" data-action="find_hospitals" aria-label="Find Hospitals">
+              <span>🚨</span> Find Hospitals
+            </button>
+            <button type="button" class="rakshak-chip-btn rakshak-chip-emergency" data-action="find_icu" aria-label="Find ICU Beds">
+              <span>🛏️</span> Find ICU Beds
+            </button>
+            <button type="button" class="rakshak-chip-btn rakshak-chip-blood" data-action="find_blood" aria-label="Find Blood Services">
+              <span>🩸</span> Find Blood
+            </button>
+            <button type="button" class="rakshak-chip-btn rakshak-chip-pharmacy" data-action="medical_shops" aria-label="24×7 Medical Shops">
+              <span>💊</span> Medical Shops
+            </button>
+            <button type="button" class="rakshak-chip-btn rakshak-chip-intake" data-action="patient_intake" aria-label="Patient Intake">
+              <span>📋</span> Patient Intake
+            </button>
+            <a href="tel:112" class="rakshak-chip-btn rakshak-chip-call" aria-label="Call Emergency 112">
+              <span>📞</span> Call 112
+            </a>
+          </div>
+        </div>
+
+        <!-- Suggested Questions / Smart Prompt Chips (Feature #11) -->
+        <div class="rakshak-chips-section" style="margin-top: 14px;">
+          <div class="rakshak-chips-label">
+            <span class="rakshak-label-icon" aria-hidden="true">💡</span> Suggested Questions
+          </div>
+          <div class="rakshak-suggested-grid" id="rakshakSuggestedQuestions">
+            <button type="button" class="rakshak-prompt-chip" data-prompt="Which hospitals have available ICU beds?" aria-label="Ask: Which hospitals have available ICU beds?">
+              "Which hospitals have available ICU beds?"
+            </button>
+            <button type="button" class="rakshak-prompt-chip" data-prompt="Where can I find blood services in West Bengal?" aria-label="Ask: Where can I find blood services in West Bengal?">
+              "Where can I find blood services?"
+            </button>
+            <button type="button" class="rakshak-prompt-chip" data-prompt="How do I submit an emergency patient intake?" aria-label="Ask: How do I submit an emergency patient intake?">
+              "How do I submit an emergency patient intake?"
+            </button>
+            <button type="button" class="rakshak-prompt-chip" data-prompt="How can I locate 24×7 medical shops nearby?" aria-label="Ask: How can I locate 24×7 medical shops nearby?">
+              "How can I locate 24×7 medical shops nearby?"
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Conversation Messages List -->
+    <div class="rakshak-messages-list" id="rakshakMessagesList"></div>
+  </div>
+
+  <!-- Chat Input Footer -->
+  <div class="rakshak-chat-footer">
+    <form class="rakshak-input-form" id="rakshakInputForm" autocomplete="off">
+      <div class="rakshak-input-wrapper">
+        <textarea
+          id="rakshakChatInput"
+          class="rakshak-input-field"
+          placeholder="Ask Dr. Rakshak (e.g. Find ICU beds in Kolkata)..."
+          rows="1"
+          maxlength="800"
+          aria-label="Message Dr. Rakshak AI Health Assistant"
+        ></textarea>
+        
+        <!-- Stop AI Response Typing Button (Feature #6) -->
+        <button
+          type="button"
+          class="rakshak-stop-btn"
+          id="rakshakStopBtn"
+          title="Stop AI typing"
+          aria-label="Stop AI response"
+          hidden
+        >
+          <span class="rakshak-stop-icon" aria-hidden="true">⏹</span>
+          <span class="rakshak-stop-text">Stop</span>
+        </button>
+
+        <!-- Send Button -->
+        <button
+          type="submit"
+          class="rakshak-send-btn"
+          id="rakshakSendBtn"
+          title="Send message"
+          aria-label="Send message to Dr. Rakshak"
+        >
+          <svg class="rakshak-send-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </form>
+    <div class="rakshak-footer-disclaimer">
+      <span>AI Assistant · For critical emergencies call <strong>112</strong> immediately.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Reset / New Chat Confirmation Modal (Feature #12) -->
+<div class="modal-overlay" id="rakshakResetModalOverlay" hidden>
+  <div class="modal rakshak-reset-modal" role="dialog" aria-modal="true" aria-labelledby="rakshakResetTitle" style="max-width: 420px; text-align: center; padding: 22px;">
+    <div style="font-size: 2.2rem; line-height: 1; margin-bottom: 8px;" aria-hidden="true">🔄</div>
+    <h3 id="rakshakResetTitle" style="margin: 0 0 6px; font-size: 1.15rem; color: var(--secondary);">Start a new chat?</h3>
+    <p style="font-size: 0.85rem; color: var(--muted); margin: 0 0 16px;">
+      Your current conversation will be cleared from this chat view. Your hospital and medical records are not affected.
+    </p>
+    <div class="modal-footer" style="display: flex; justify-content: center; gap: 8px;">
+      <button type="button" class="btn btn-ghost" id="rakshakResetCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="rakshakResetConfirmBtn">New Chat</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- Socket.IO & Leaflet Scripts -->
