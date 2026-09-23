@@ -25,6 +25,7 @@ const bloodBankRoutes = require('./routes/bloodBankRoutes');
 const bloodRequestRoutes = require('./routes/bloodRequestRoutes');
 const donorRoutes = require('./routes/donorRoutes');
 const medicalShopRoutes = require('./routes/medicalShopRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -182,6 +183,7 @@ app.use('/api/blood-inventory', bloodBankRoutes);
 app.use('/api/blood-requests', bloodRequestRoutes);
 app.use('/api/donors', donorRoutes);
 app.use('/api/medical-shops', medicalShopRoutes);
+app.use('/api/chat', chatRoutes);
 
 // 404 & Global Error Handling
 app.use(notFound);
