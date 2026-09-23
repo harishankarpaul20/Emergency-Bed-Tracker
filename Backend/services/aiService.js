@@ -30,9 +30,9 @@ IDENTITY & PRINCIPLES:
  */
 async function generateChatResponse(userMessage, history = []) {
   const apiKey = process.env.GROQ_API_KEY;
-  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const model = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
-  if (!apiKey || apiKey === 'your_groq_api_key_here') {
+  if (!apiKey || apiKey === 'your_groq_api_key_here' || apiKey === 'PASTE_YOUR_GROQ_KEY_HERE') {
     logger.warn('Groq API Key is not configured in environment variables.');
     return {
       success: false,
@@ -78,7 +78,7 @@ async function generateChatResponse(userMessage, history = []) {
         model: model,
         messages: messages,
         temperature: 0.5,
-        max_tokens: 1024,
+        max_tokens: 750,
       }),
       signal: controller.signal,
     });

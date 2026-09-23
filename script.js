@@ -4812,6 +4812,7 @@
     const isOnline = navigator.onLine;
     if (rakshakOfflineBanner) {
       rakshakOfflineBanner.hidden = isOnline;
+      rakshakOfflineBanner.style.display = isOnline ? 'none' : 'flex';
     }
   }
   window.addEventListener('online', updateOnlineStatus);
@@ -5184,6 +5185,11 @@
     const text = (rawText || '').trim();
     if (!text) return;
 
+    // Prevent concurrent duplicate execution (Feature #1, #2)
+    if ((chatState === 'PROCESSING' || chatState === 'TYPING') && !options.isRegenerate) {
+      return;
+    }
+
     const generation = currentConversationGeneration;
 
     // Check offline status (Feature #13)
@@ -5343,6 +5349,7 @@
   // Feature #11: Suggested Questions click listener
   if (rakshakSuggestedQuestions) {
     rakshakSuggestedQuestions.addEventListener('click', (e) => {
+      if (chatState === 'PROCESSING' || chatState === 'TYPING') return;
       const chip = e.target.closest('.rakshak-prompt-chip');
       if (!chip) return;
       const promptText = chip.getAttribute('data-prompt');
@@ -5453,7 +5460,7 @@
         if (chatState === 'PROCESSING' || chatState === 'TYPING') return;
         // Remove the failed assistant message and resend query
         chatMessages = chatMessages.filter(m => m.id !== msgId);
-        sendChatMessage(msg.originalQuery, { isRegenerate: true });
+        sendChatMessage(msg.originalQuery, { isRegenerate: true, targetMessageId: msg.id });
       }
     });
   }

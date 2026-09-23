@@ -2808,6 +2808,9 @@ button { font-family: inherit; }
   gap: 6px;
   flex-shrink: 0;
 }
+.rakshak-offline-banner[hidden] {
+  display: none !important;
+}
 
 /* 5. Chat Body & Scroll Area */
 .rakshak-chat-body {
