@@ -5180,6 +5180,57 @@
     }
   }
 
+  const SAFE_HISTORY_CONTENT_LIMIT = 1800;
+
+  /**
+   * Helper: Prepare sanitized, safe conversation history for /api/chat
+   * Enforces 1800-character safe limit per history item.
+   * Full message text remains untouched in chatMessages for user UI.
+   */
+  function prepareSafeHistoryPayload(messages) {
+    if (!Array.isArray(messages)) return [];
+
+    return messages
+      .filter(m => m && m.status === 'completed' && typeof m.content === 'string' && m.content.trim())
+      .slice(-6)
+      .map(m => {
+        let content = m.content.trim();
+        if (content.length > SAFE_HISTORY_CONTENT_LIMIT) {
+          // Truncate cleanly at a sentence, paragraph, or word boundary
+          let candidate = content.slice(0, SAFE_HISTORY_CONTENT_LIMIT);
+          const lastBoundary = Math.max(
+            candidate.lastIndexOf('\n\n'),
+            candidate.lastIndexOf('\n'),
+            candidate.lastIndexOf('. '),
+            candidate.lastIndexOf('? '),
+            candidate.lastIndexOf('! ')
+          );
+
+          if (lastBoundary > 1200) {
+            candidate = candidate.slice(0, lastBoundary + 1).trim();
+          } else {
+            const lastSpace = candidate.lastIndexOf(' ');
+            if (lastSpace > 1400) {
+              candidate = candidate.slice(0, lastSpace).trim();
+            }
+          }
+
+          content = (candidate || content.slice(0, SAFE_HISTORY_CONTENT_LIMIT)).trim();
+        }
+
+        // Hard clamp to guarantee <= 1800 under all conditions
+        if (content.length > SAFE_HISTORY_CONTENT_LIMIT) {
+          content = content.slice(0, SAFE_HISTORY_CONTENT_LIMIT).trim();
+        }
+
+        return {
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: content
+        };
+      })
+      .filter(m => Boolean(m.content));
+  }
+
   // Send Chat Message Controller (Features #1, #2, #4, #13, #14)
   async function sendChatMessage(rawText, options = {}) {
     const text = (rawText || '').trim();
@@ -5279,11 +5330,8 @@
 
     renderChatMessages();
 
-    // Prepare conversation context
-    const historyPayload = chatMessages
-      .filter(m => m.status === 'completed')
-      .slice(-6)
-      .map(m => ({ role: m.role, content: m.content }));
+    // Prepare conversation context (Safely bounded to <= 1800 chars per message)
+    const historyPayload = prepareSafeHistoryPayload(chatMessages);
 
     try {
       const responseText = await fetchAIResponse(text, historyPayload, generation);

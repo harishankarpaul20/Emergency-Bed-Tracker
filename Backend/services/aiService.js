@@ -54,7 +54,7 @@ async function generateChatResponse(userMessage, history = []) {
     for (const h of validHistory) {
       messages.push({
         role: h.role,
-        content: h.content.slice(0, 2000),
+        content: h.content.slice(0, 1800),
       });
     }
   }
