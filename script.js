@@ -2956,6 +2956,8 @@
     if (!bloodBankPortal) return;
     const medPortal = document.getElementById('medicalShopPortal');
     if (medPortal) medPortal.hidden = true;
+    const ambPortal = document.getElementById('ambulancePortal');
+    if (ambPortal) ambPortal.hidden = true;
     const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal)');
     
     // Hide all main homepage sections
@@ -2980,15 +2982,17 @@
   }
 
   function navigateToOriginalHome(updateHistory = true, targetSectionId = null) {
-    const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal):not(#medicalShopPortal)');
+    const mainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal):not(#medicalShopPortal):not(#ambulancePortal)');
     
     // 1. Unhide all original homepage sections
     mainSections.forEach(s => (s.hidden = false));
 
-    // 2. Hide Blood Bank Portal and Medical Shop Portal completely
+    // 2. Hide Blood Bank Portal, Medical Shop Portal, and Ambulance Portal completely
     if (bloodBankPortal) bloodBankPortal.hidden = true;
     const medPortal = document.getElementById('medicalShopPortal');
     if (medPortal) medPortal.hidden = true;
+    const ambPortal = document.getElementById('ambulancePortal');
+    if (ambPortal) ambPortal.hidden = true;
 
     // 3. Close mobile drawer menu if open
     if (mobileMenu && mobileMenu.classList.contains('open')) {
@@ -3054,9 +3058,11 @@
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const medPortal = document.getElementById('medicalShopPortal');
+        const ambPortal = document.getElementById('ambulancePortal');
         const isBloodActive = bloodBankPortal && !bloodBankPortal.hidden;
         const isMedActive = medPortal && !medPortal.hidden;
-        if (isBloodActive || isMedActive) {
+        const isAmbActive = ambPortal && !ambPortal.hidden;
+        if (isBloodActive || isMedActive || isAmbActive) {
           navigateToOriginalHome(true, '#emergency-patient-intake');
         } else {
           const intakeSec = document.getElementById('emergency-patient-intake');
@@ -3080,16 +3086,18 @@
     });
   });
 
-  // E) Other Navbar links when inside Blood Bank Portal or Medical Shop Portal
+  // E) Other Navbar links when inside Blood Bank Portal, Medical Shop Portal, or Ambulance Portal
   document.querySelectorAll('#navLinks a, #mobileMenu a, .footer-links a').forEach(link => {
     const href = link.getAttribute('href');
-    if (!href || href === '#blood-bank' || href === '#medical-shops' || href.startsWith('tel:') || href === '#staff-portal') return;
+    if (!href || href === '#blood-bank' || href === '#medical-shops' || href === '#ambulance' || href.startsWith('tel:') || href === '#staff-portal') return;
 
     link.addEventListener('click', (e) => {
       const medPortal = document.getElementById('medicalShopPortal');
+      const ambPortal = document.getElementById('ambulancePortal');
       const isBloodActive = bloodBankPortal && !bloodBankPortal.hidden;
       const isMedActive = medPortal && !medPortal.hidden;
-      if (isBloodActive || isMedActive) {
+      const isAmbActive = ambPortal && !ambPortal.hidden;
+      if (isBloodActive || isMedActive || isAmbActive) {
         e.preventDefault();
         if (href === '#main-content' || href === '#home') {
           navigateToOriginalHome(true);
@@ -3104,20 +3112,30 @@
   function handleNavigationSync() {
     const hash = window.location.hash;
     const medPortal = document.getElementById('medicalShopPortal');
+    const ambPortal = document.getElementById('ambulancePortal');
     if (hash === '#blood-bank') {
       if (medPortal) medPortal.hidden = true;
+      if (ambPortal) ambPortal.hidden = true;
       if (bloodBankPortal && bloodBankPortal.hidden) {
         showBloodBankPortal(false); // don't push duplicate history entry
       }
     } else if (hash === '#medical-shops') {
       if (bloodBankPortal) bloodBankPortal.hidden = true;
+      if (ambPortal) ambPortal.hidden = true;
       if (medPortal && medPortal.hidden && typeof showMedicalShopPortal === 'function') {
         showMedicalShopPortal(false);
+      }
+    } else if (hash === '#ambulance') {
+      if (bloodBankPortal) bloodBankPortal.hidden = true;
+      if (medPortal) medPortal.hidden = true;
+      if (ambPortal && ambPortal.hidden && typeof showAmbulancePortal === 'function') {
+        showAmbulancePortal(false);
       }
     } else {
       const isBloodActive = bloodBankPortal && !bloodBankPortal.hidden;
       const isMedActive = medPortal && !medPortal.hidden;
-      if (isBloodActive || isMedActive) {
+      const isAmbActive = ambPortal && !ambPortal.hidden;
+      if (isBloodActive || isMedActive || isAmbActive) {
         navigateToOriginalHome(false, hash || null); // don't push duplicate history entry
       }
     }
@@ -3133,11 +3151,17 @@
     if (typeof showMedicalShopPortal === 'function') {
       showMedicalShopPortal(false);
     }
+  } else if (window.location.hash === '#ambulance') {
+    if (typeof showAmbulancePortal === 'function') {
+      showAmbulancePortal(false);
+    }
   } else {
     if (bloodBankPortal) bloodBankPortal.hidden = true;
     const medPortal = document.getElementById('medicalShopPortal');
     if (medPortal) medPortal.hidden = true;
-    const initialMainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal):not(#medicalShopPortal)');
+    const ambPortal = document.getElementById('ambulancePortal');
+    if (ambPortal) ambPortal.hidden = true;
+    const initialMainSections = document.querySelectorAll('#main-content > section:not(#bloodBankPortal):not(#medicalShopPortal):not(#ambulancePortal)');
     initialMainSections.forEach(s => (s.hidden = false));
   }
 
@@ -4611,6 +4635,8 @@
   function showMedicalShopPortal(updateHistory = true) {
     if (!medicalShopPortal) return;
     if (bloodBankPortal) bloodBankPortal.hidden = true;
+    const ambPortal = document.getElementById('ambulancePortal');
+    if (ambPortal) ambPortal.hidden = true;
 
     const mainSections = document.querySelectorAll('#main-content > section:not(#medicalShopPortal)');
     mainSections.forEach(s => (s.hidden = true));
@@ -4728,6 +4754,1286 @@
   // Check initial hash on load for #medical-shops
   if (window.location.hash === '#medical-shops') {
     showMedicalShopPortal(false);
+  }
+
+  /* =====================================================
+     16.5. LIVE AMBULANCE FINDER MODULE
+     Frontend-Only Mock Demonstration for Emergency Ambulance
+     Discovery, Triage Priority, Interactive Map, Modals, & Requests
+     ===================================================== */
+
+  // --- MOCK AMBULANCE DATA (16 Units Statewide & Cross-Border) ---
+  const MOCK_AMBULANCES = [
+    {
+      id: 'AMB-101',
+      unitCode: 'WB-01-AL-2045',
+      type: 'ALS',
+      typeName: 'Advanced Life Support (ALS)',
+      provider: 'Apollo Emergency Fleet',
+      baseArea: 'Kolkata Central (Park Street)',
+      district: 'Kolkata',
+      latitude: 22.5520,
+      longitude: 88.3530,
+      distance: 2.1,
+      eta: '6–9 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Multiparameter Cardiac Monitor',
+        'Portable Oxygen Cylinder (Type D)',
+        'Transport Ventilator (Adult/Pediatric)',
+        'Biphasic Defibrillator (AED)',
+        'Motorized Suction Unit',
+        'Spine Board & Cervical Collar Set',
+        'Emergency Drug Kit & IV Infusion',
+        'Pulse Oximeter & BP Monitor'
+      ],
+      crew: 'Paramedic EMT-P + Emergency Driver (Demo)',
+      vehicleReg: 'WB 01 AL 2045',
+      phone: '033-2280-9999 (Demo)',
+      notes: 'Fully sanitized, on-board telemetry ready.'
+    },
+    {
+      id: 'AMB-102',
+      unitCode: 'WB-02-IC-3108',
+      type: 'ICU',
+      typeName: 'ICU / Critical Care Transport',
+      provider: 'SSKM Critical Care Transit',
+      baseArea: 'Bhowanipore / SSKM',
+      district: 'Kolkata',
+      latitude: 22.5398,
+      longitude: 88.3426,
+      distance: 3.4,
+      eta: '9–13 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'ICU Grade Transport Ventilator',
+        'Advanced Cardiac Life Support Monitor',
+        'Dual Syringe & Infusion Pumps',
+        'Central Medical Gas System & Dual O2',
+        'Arterial Blood Gas (ABG) Kit',
+        'Emergency Resuscitation Medications',
+        'Intubation Set & Video Laryngoscope',
+        'Vacuum Mattress & Stretcher'
+      ],
+      crew: 'Critical Care Medical Officer + EMT-A (Demo)',
+      vehicleReg: 'WB 02 IC 3108',
+      phone: '033-2223-1122 (Demo)',
+      notes: 'Doctor-on-board critical transport certified.'
+    },
+    {
+      id: 'AMB-103',
+      unitCode: 'WB-04-BL-1892',
+      type: 'BLS',
+      typeName: 'Basic Life Support (BLS)',
+      provider: 'St. John Ambulance WB',
+      baseArea: 'Kankurgachi / Phoolbagan',
+      district: 'Kolkata',
+      latitude: 22.5780,
+      longitude: 88.3890,
+      distance: 2.8,
+      eta: '7–11 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'High Flow Oxygen Delivery System',
+        'Foldable Stretcher & Scoop Stretcher',
+        'First Aid & Trauma Bandaging Kit',
+        'Manual Resuscitator (Ambu Bag)',
+        'Automated External Defibrillator (AED)',
+        'Blood Glucose Monitor & Pulse Oximeter'
+      ],
+      crew: 'First Responder EMT-B + Certified Driver (Demo)',
+      vehicleReg: 'WB 04 BL 1892',
+      phone: '033-2334-4500 (Demo)',
+      notes: 'Standard basic emergency transfer.'
+    },
+    {
+      id: 'AMB-104',
+      unitCode: 'WB-06-PT-4512',
+      type: 'PT',
+      typeName: 'Patient Transport Vehicle (PTV)',
+      provider: 'Lifeline Medi-Van Services',
+      baseArea: 'Salt Lake Sector II',
+      district: 'North 24 Parganas',
+      latitude: 22.5855,
+      longitude: 88.4120,
+      distance: 4.6,
+      eta: '12–16 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Wheelchair Ramp & Securing Harness',
+        'Hydraulic Stretcher System',
+        'Basic First Aid & Cold Packs',
+        'Low Flow Oxygen Support (Optional)',
+        'Companion Seating'
+      ],
+      crew: 'Driver Attendant + Patient Care Assistant (Demo)',
+      vehicleReg: 'WB 06 PT 4512',
+      phone: '033-2358-8877 (Demo)',
+      notes: 'Ideal for non-critical transfers, dialysis trips, and hospital discharges.'
+    },
+    {
+      id: 'AMB-105',
+      unitCode: 'WB-01-NI-5501',
+      type: 'NICU',
+      typeName: 'Neonatal / Pediatric ICU (NICU)',
+      provider: 'Chittaranjan Seva Sadan Specialized Unit',
+      baseArea: 'Kalighat / Hazra',
+      district: 'Kolkata',
+      latitude: 22.5230,
+      longitude: 88.3490,
+      distance: 4.8,
+      eta: '14–18 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Neonatal Transport Incubator',
+        'Neonatal Ventilator (High-Frequency capable)',
+        'Infant Resuscitation Warmer Unit',
+        'Micro-Infusion Syringe Pumps',
+        'Pediatric Pulse Oximeter & Monitor',
+        'Medical Grade Air & Oxygen Blender'
+      ],
+      crew: 'Neonatal Intensive Care Nurse + Pediatric EMT (Demo)',
+      vehicleReg: 'WB 01 NI 5501',
+      phone: '033-2475-6677 (Demo)',
+      notes: 'Customized suspension for infant vibration dampening.'
+    },
+    {
+      id: 'AMB-106',
+      unitCode: 'WB-03-AL-9014',
+      type: 'ALS',
+      typeName: 'Advanced Life Support (ALS)',
+      provider: 'Howrah General Emergency Response',
+      baseArea: 'Howrah Station / Mandirtala',
+      district: 'Howrah',
+      latitude: 22.5840,
+      longitude: 88.3180,
+      distance: 5.2,
+      eta: '15–20 min',
+      status: 'BUSY',
+      equipment: [
+        'Cardiac Monitor & Defibrillator',
+        'Adult Transport Ventilator',
+        'Dual Oxygen Cylinders',
+        'Cervical Immobilization Gear',
+        'IV Cannulation & Drug Kit'
+      ],
+      crew: 'Paramedic EMT-P + Driver (Demo)',
+      vehicleReg: 'WB 03 AL 9014',
+      phone: '033-2641-2300 (Demo)',
+      notes: 'Currently on emergency call near Nabanna. ETA updates upon dispatch clearance.'
+    },
+    {
+      id: 'AMB-107',
+      unitCode: 'WB-05-MO-6623',
+      type: 'MORTUARY',
+      typeName: 'Mortuary Freezer Van',
+      provider: 'Peaceful Transit WB Support',
+      baseArea: 'Sealdah / Entally',
+      district: 'Kolkata',
+      latitude: 22.5640,
+      longitude: 88.3710,
+      distance: 1.8,
+      eta: '8–12 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Sub-Zero Temperature Storage Cabinet',
+        'Stainless Steel Roll-in Body Tray',
+        'Formalin / Hygiene Containment Seal',
+        'Hydraulic Loading Platform',
+        'Deodorizing Air Filtration System'
+      ],
+      crew: 'Sanitation Care Assistant + Driver (Demo)',
+      vehicleReg: 'WB 05 MO 6623',
+      phone: '033-2265-1100 (Demo)',
+      notes: 'Dignified transfer for post-mortem, inter-city, or funeral arrangements.'
+    },
+    {
+      id: 'AMB-108',
+      unitCode: 'WB-01-BL-7719',
+      type: 'BLS',
+      typeName: 'Basic Life Support (BLS)',
+      provider: 'Red Cross Society Bengal',
+      baseArea: 'College Street / Bowbazar',
+      district: 'Kolkata',
+      latitude: 22.5710,
+      longitude: 88.3610,
+      distance: 1.2,
+      eta: '5–8 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Oxygen Cylinder & Mask Kit',
+        'Multi-Position Stretcher',
+        'Standard Trauma Kit',
+        'Manual Suction Apparatus',
+        'Ambu Bag & Oropharyngeal Airways'
+      ],
+      crew: 'Certified Red Cross Volunteer + EMT (Demo)',
+      vehicleReg: 'WB 01 BL 7719',
+      phone: '033-2241-7890 (Demo)',
+      notes: 'Rapid local responder for Central Kolkata.'
+    },
+    {
+      id: 'AMB-109',
+      unitCode: 'WB-02-IC-8840',
+      type: 'ICU',
+      typeName: 'ICU / Critical Care Transport',
+      provider: 'Ruby Emergency & Critical Care',
+      baseArea: 'Ruby Golpark / Kasba',
+      district: 'Kolkata',
+      latitude: 22.5130,
+      longitude: 88.3990,
+      distance: 6.5,
+      eta: '16–22 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Transport Ventilator (Invasive/Non-Invasive)',
+        'ECG / Defibrillator with Pacing',
+        'Multiparameter Vital Signs Monitor',
+        'Infusion Pumps (3 channels)',
+        'Direct Laryngoscope & Suction',
+        'Emergency Resuscitation Tray'
+      ],
+      crew: 'Emergency Physician + EMT-P (Demo)',
+      vehicleReg: 'WB 02 IC 8840',
+      phone: '033-2442-9900 (Demo)',
+      notes: 'Equipped for critical inter-hospital ECMO and ventilator transfers.'
+    },
+    {
+      id: 'AMB-110',
+      unitCode: 'WB-04-AL-1288',
+      type: 'ALS',
+      typeName: 'Advanced Life Support (ALS)',
+      provider: 'Medica Superspecialty Mobile Unit',
+      baseArea: 'Mukundapur / EM Bypass',
+      district: 'Kolkata',
+      latitude: 22.4980,
+      longitude: 88.4010,
+      distance: 7.8,
+      eta: '18–24 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Advanced Defibrillator & Cardiac Pacer',
+        'Hamilton T1 Transport Ventilator',
+        'Dual Oxygen Cylinders',
+        'Point-of-Care Ultrasound (POCUS Demo)',
+        'Emergency Drug Supply'
+      ],
+      crew: 'Emergency Medical Technician + Driver (Demo)',
+      vehicleReg: 'WB 04 AL 1288',
+      phone: '033-6652-0000 (Demo)',
+      notes: 'High-speed highway corridor responder.'
+    },
+    {
+      id: 'AMB-111',
+      unitCode: 'WB-07-BL-3344',
+      type: 'BLS',
+      typeName: 'Basic Life Support (BLS)',
+      provider: 'Barasat Sub-Divisional Fleet',
+      baseArea: 'Barasat / Jessore Road',
+      district: 'North 24 Parganas',
+      latitude: 22.7210,
+      longitude: 88.4820,
+      distance: 18.5,
+      eta: '25–35 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Oxygen Cylinder & Regulator',
+        'Folding Stretcher',
+        'Basic Dressing & Burn Sheets',
+        'AED Defibrillator'
+      ],
+      crew: 'District EMT + Driver (Demo)',
+      vehicleReg: 'WB 07 BL 3344',
+      phone: '033-2584-1100 (Demo)',
+      notes: 'Suburban coverage for North 24 Parganas.'
+    },
+    {
+      id: 'AMB-112',
+      unitCode: 'WB-19-AL-4455',
+      type: 'ALS',
+      typeName: 'Advanced Life Support (ALS)',
+      provider: 'Durgapur Steel Plant Emergency Care',
+      baseArea: 'City Centre, Durgapur',
+      district: 'Paschim Bardhaman',
+      latitude: 23.5350,
+      longitude: 87.2980,
+      distance: 165.0,
+      eta: '10–15 min (Local)',
+      status: 'AVAILABLE',
+      equipment: [
+        'Cardiac Monitor & Defibrillator',
+        'Transport Ventilator',
+        'Trauma Immobilization Gear',
+        'Emergency Resuscitation Drugs'
+      ],
+      crew: 'Industrial Paramedic + Driver (Demo)',
+      vehicleReg: 'WB 19 AL 4455',
+      phone: '0343-254-5500 (Demo)',
+      notes: 'Serving Paschim Bardhaman and industrial corridor.'
+    },
+    {
+      id: 'AMB-113',
+      unitCode: 'WB-73-IC-9912',
+      type: 'ICU',
+      typeName: 'ICU / Critical Care Transport',
+      provider: 'North Bengal Medical College Transit',
+      baseArea: 'Siliguri / Sushrutanagar',
+      district: 'Darjeeling',
+      latitude: 26.6950,
+      longitude: 88.3720,
+      distance: 480.0,
+      eta: '12–18 min (Local)',
+      status: 'AVAILABLE',
+      equipment: [
+        'ICU Ventilator with PEEP',
+        'Cardiac Defibrillator & Monitor',
+        'Infusion Pumps',
+        'Air-Oxygen Mixer Unit'
+      ],
+      crew: 'Medical Officer + EMT-A (Demo)',
+      vehicleReg: 'WB 73 IC 9912',
+      phone: '0353-257-2200 (Demo)',
+      notes: 'Serving North Bengal foothills, Siliguri, and Darjeeling region.'
+    },
+    {
+      id: 'AMB-114',
+      unitCode: 'JH-05-AL-6677',
+      type: 'ALS',
+      typeName: 'Advanced Life Support (ALS)',
+      provider: 'Tata Main Hospital Emergency Fleet',
+      baseArea: 'Bistupur, Jamshedpur',
+      district: 'Jamshedpur Border',
+      latitude: 22.8020,
+      longitude: 86.1850,
+      distance: 240.0,
+      eta: '10–15 min (Local)',
+      status: 'AVAILABLE',
+      equipment: [
+        'Advanced Cardiac Monitor',
+        'Oxygen Generator Unit',
+        'Portable Ventilator',
+        'Emergency Medication Kit'
+      ],
+      crew: 'Certified EMT + Driver (Demo)',
+      vehicleReg: 'JH 05 AL 6677',
+      phone: '0657-222-4455 (Demo)',
+      notes: 'Cross-border emergency liaison unit for West Bengal / Jharkhand corridor.'
+    },
+    {
+      id: 'AMB-115',
+      unitCode: 'WB-01-PT-9800',
+      type: 'PT',
+      typeName: 'Patient Transport Vehicle (PTV)',
+      provider: 'Kolkata Municipal Health Fleet',
+      baseArea: 'Tollygunge / Kudghat',
+      district: 'Kolkata',
+      latitude: 22.4850,
+      longitude: 88.3470,
+      distance: 8.2,
+      eta: '20–25 min',
+      status: 'OFFLINE',
+      equipment: [
+        'Basic Stretcher & Wheelchair Ramp',
+        'Standard First Aid Box'
+      ],
+      crew: 'Driver Attendant (Demo)',
+      vehicleReg: 'WB 01 PT 9800',
+      phone: '033-2411-9988 (Demo)',
+      notes: 'Currently undergoing scheduled vehicle maintenance.'
+    },
+    {
+      id: 'AMB-116',
+      unitCode: 'WB-02-AL-5521',
+      type: 'ALS',
+      typeName: 'Advanced Life Support (ALS)',
+      provider: 'Fortis Hospital Anandapur Rapid Unit',
+      baseArea: 'Anandapur / EM Bypass',
+      district: 'Kolkata',
+      latitude: 22.5100,
+      longitude: 88.4010,
+      distance: 6.9,
+      eta: '14–19 min',
+      status: 'AVAILABLE',
+      equipment: [
+        'Cardiac Monitor & 12-lead ECG',
+        'Transport Ventilator',
+        'Defibrillator / Pacer',
+        'IV Syringe Pump',
+        'Suction System'
+      ],
+      crew: 'Paramedic + Driver (Demo)',
+      vehicleReg: 'WB 02 AL 5521',
+      phone: '033-6628-4444 (Demo)',
+      notes: 'Rapid deployment unit covering South-East Kolkata bypass.'
+    }
+  ];
+
+  // --- MOCK RECENT REQUESTS ---
+  let MOCK_RECENT_REQUESTS = [
+    {
+      requestId: 'DEMO-AMB-8831',
+      unitCode: 'WB-01-AL-2045',
+      type: 'Advanced Life Support (ALS)',
+      patientName: 'Anirban Sen (Demo)',
+      pickup: 'Salt Lake Sector V, Kolkata',
+      destination: 'Apollo Multispeciality Hospitals',
+      priority: 'Urgent',
+      status: 'Dispatched (Demo)',
+      eta: '~9 min',
+      timeAgo: '12 mins ago'
+    },
+    {
+      requestId: 'DEMO-AMB-7740',
+      unitCode: 'WB-02-IC-3108',
+      type: 'ICU / Critical Care Transport',
+      patientName: 'Devika Mukherjee (Demo)',
+      pickup: 'Elgin Road, Kolkata',
+      destination: 'SSKM Trauma Centre',
+      priority: 'Critical',
+      status: 'En Route (Demo)',
+      eta: '~6 min',
+      timeAgo: '28 mins ago'
+    },
+    {
+      requestId: 'DEMO-AMB-6502',
+      unitCode: 'WB-04-BL-1892',
+      type: 'Basic Life Support (BLS)',
+      patientName: 'Kajal Roy (Demo)',
+      pickup: 'Phoolbagan, Kolkata',
+      destination: 'Calcutta National Medical College',
+      priority: 'Non-Critical',
+      status: 'Completed (Demo)',
+      eta: 'Arrived',
+      timeAgo: '1 hour ago'
+    }
+  ];
+
+  // --- LOCATION COORDINATES REFERENCE ---
+  const LOCATION_COORDS = {
+    'kolkata': [22.5726, 88.3639],
+    'kolkata central': [22.5697, 88.3697],
+    'park street': [22.5520, 88.3530],
+    'salt lake': [22.5855, 88.4120],
+    'howrah': [22.5958, 88.2636],
+    'jadavpur': [22.4990, 88.3710],
+    'alipore': [22.5330, 88.3300],
+    'bhowanipore': [22.5398, 88.3426],
+    'sskm': [22.5398, 88.3426],
+    'shyambazar': [22.6030, 88.3760],
+    'kankurgachi': [22.5820, 88.3960],
+    'kasba': [22.5140, 88.3850],
+    'new alipore': [22.5090, 88.3320],
+    'anandapur': [22.5100, 88.3980],
+    'durgapur': [23.5204, 87.3119],
+    'asansol': [23.6739, 86.9524],
+    'siliguri': [26.7271, 88.3953],
+    'darjeeling': [27.0360, 88.2627],
+    'malda': [25.0088, 88.1414],
+    'murshidabad': [24.0965, 88.2517],
+    'berhampore': [24.0965, 88.2517],
+    'nadia': [22.9750, 88.4340],
+    'kalyani': [22.9750, 88.4340],
+    'kharagpur': [22.3460, 87.2320],
+    'medinipur': [22.4200, 87.3200],
+    'haldia': [22.0667, 88.0698],
+    'bankura': [23.2324, 87.0740],
+    'purulia': [23.3320, 86.3650],
+    'jalpaiguri': [26.5433, 88.7293],
+    'cooch behar': [26.3260, 89.4470],
+    'alipurduar': [26.4919, 89.5271],
+    'birbhum': [23.9200, 87.5340],
+    'suri': [23.9200, 87.5340],
+    'jamshedpur': [22.8020, 86.1850]
+  };
+
+  // --- AMBULANCE DOM ELEMENTS ---
+  const ambulancePortal = document.getElementById('ambulancePortal');
+  const navAmbulanceBtn = document.getElementById('navAmbulanceBtn');
+  const navAmbulanceLink = document.getElementById('navAmbulanceLink');
+  const mobileAmbulanceBtn = document.getElementById('mobileAmbulanceBtn');
+  const ambulanceLauncherBtn = document.getElementById('ambulanceLauncherBtn');
+  const ambulanceBackHomeBtn = document.getElementById('ambulanceBackHomeBtn');
+
+  // Search Form Elements
+  const ambulanceSearchForm = document.getElementById('ambulanceSearchForm');
+  const ambulanceLocationInput = document.getElementById('ambulanceLocationInput');
+  const ambulanceUseLocationBtn = document.getElementById('ambulanceUseLocationBtn');
+  const ambulanceLocationHint = document.getElementById('ambulanceLocationHint');
+  const ambulanceRadiusSelect = document.getElementById('ambulanceRadiusSelect');
+  const ambTypeCards = document.querySelectorAll('.amb-type-card');
+  const ambPriorityInputs = document.querySelectorAll('input[name="ambPriority"]');
+  const ambulanceSearchBtn = document.getElementById('ambulanceSearchBtn');
+  const ambulanceResetSearchBtn = document.getElementById('ambulanceResetSearchBtn');
+
+  // Results & Layout Elements
+  const ambulanceResultsCountText = document.getElementById('ambulanceResultsCountText');
+  const ambulanceCountNum = document.getElementById('ambulanceCountNum');
+  const ambulanceRadiusLabel = document.getElementById('ambulanceRadiusLabel');
+  const ambulanceAvailableOnlyCheck = document.getElementById('ambulanceAvailableOnlyCheck');
+  const ambulanceSortSelect = document.getElementById('ambulanceSortSelect');
+  const ambulanceLoadingCard = document.getElementById('ambulanceLoadingCard');
+  const ambulanceEmptyCard = document.getElementById('ambulanceEmptyCard');
+  const ambulanceEmptyReasonText = document.getElementById('ambulanceEmptyReasonText');
+  const ambulanceExpandRadiusBtn = document.getElementById('ambulanceExpandRadiusBtn');
+  const ambulanceResetFiltersBtn = document.getElementById('ambulanceResetFiltersBtn');
+  const ambulanceCardsList = document.getElementById('ambulanceCardsList');
+  const ambulanceRecentList = document.getElementById('ambulanceRecentList');
+
+  // Details Modal Elements
+  const ambulanceDetailsModal = document.getElementById('ambulanceDetailsModal');
+  const ambDetailsCloseBtn = document.getElementById('ambDetailsCloseBtn');
+  const ambDetailsCancelBtn = document.getElementById('ambDetailsCancelBtn');
+  const ambDetailsRequestActionBtn = document.getElementById('ambDetailsRequestActionBtn');
+  const ambDetailsTitle = document.getElementById('ambDetailsTitle');
+  const ambDetailsTypeBadge = document.getElementById('ambDetailsTypeBadge');
+  const ambDetailsStatus = document.getElementById('ambDetailsStatus');
+  const ambDetailsEta = document.getElementById('ambDetailsEta');
+  const ambDetailsReg = document.getElementById('ambDetailsReg');
+  const ambDetailsDistance = document.getElementById('ambDetailsDistance');
+  const ambDetailsProvider = document.getElementById('ambDetailsProvider');
+  const ambDetailsArea = document.getElementById('ambDetailsArea');
+  const ambDetailsEquipmentList = document.getElementById('ambDetailsEquipmentList');
+  const ambDetailsCrew = document.getElementById('ambDetailsCrew');
+
+  // Request Modal Elements
+  const ambulanceRequestModal = document.getElementById('ambulanceRequestModal');
+  const ambRequestCloseBtn = document.getElementById('ambRequestCloseBtn');
+  const ambRequestCancelBtn = document.getElementById('ambRequestCancelBtn');
+  const ambRequestUnitId = document.getElementById('ambRequestUnitId');
+  const ambRequestUnitType = document.getElementById('ambRequestUnitType');
+  const ambRequestUnitDist = document.getElementById('ambRequestUnitDist');
+  const ambRequestUnitEta = document.getElementById('ambRequestUnitEta');
+  const ambulanceConfirmForm = document.getElementById('ambulanceConfirmForm');
+  const ambReqPatientName = document.getElementById('ambReqPatientName');
+  const ambReqPhone = document.getElementById('ambReqPhone');
+  const ambReqPickup = document.getElementById('ambReqPickup');
+  const ambReqDestination = document.getElementById('ambReqDestination');
+  const ambReqPrioritySelect = document.getElementById('ambReqPrioritySelect');
+  const ambReqNotes = document.getElementById('ambReqNotes');
+  const ambRequestSubmitBtn = document.getElementById('ambRequestSubmitBtn');
+
+  // Success Modal Elements
+  const ambulanceSuccessModal = document.getElementById('ambulanceSuccessModal');
+  const ambSuccessCloseBtn = document.getElementById('ambSuccessCloseBtn');
+  const ambSuccessId = document.getElementById('ambSuccessId');
+  const ambSuccessUnit = document.getElementById('ambSuccessUnit');
+  const ambSuccessType = document.getElementById('ambSuccessType');
+  const ambSuccessStatus = document.getElementById('ambSuccessStatus');
+  const ambSuccessEta = document.getElementById('ambSuccessEta');
+  const ambSuccessPickup = document.getElementById('ambSuccessPickup');
+  const ambSuccessDest = document.getElementById('ambSuccessDest');
+
+  // --- AMBULANCE MODULE STATE ---
+  let activeAmbulanceType = 'all';
+  let activeAmbulancePriority = 'Urgent';
+  let activeAmbulanceForModal = null;
+  let currentSearchCenter = [22.5697, 88.3697]; // Kolkata Central default
+  let ambulanceLeafletMap = null;
+  let ambulanceMarkersLayer = null;
+
+  // --- 1. SHOW / HIDE AMBULANCE PORTAL ---
+  function showAmbulancePortal(updateHistory = true) {
+    if (!ambulancePortal) return;
+
+    if (bloodBankPortal) bloodBankPortal.hidden = true;
+    const medPortal = document.getElementById('medicalShopPortal');
+    if (medPortal) medPortal.hidden = true;
+
+    const mainSections = document.querySelectorAll('#main-content > section:not(#ambulancePortal)');
+    mainSections.forEach(s => (s.hidden = true));
+    ambulancePortal.hidden = false;
+
+    window.scrollTo({ top: 0, left: 0 });
+
+    if (mobileMenu && mobileMenu.classList.contains('open')) {
+      mobileMenu.classList.remove('open');
+      if (hamburgerBtn) hamburgerBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (updateHistory && window.location.hash !== '#ambulance') {
+      history.pushState({ view: 'ambulance' }, '', '#ambulance');
+    }
+
+    initAmbulanceMap();
+    if (ambulanceLeafletMap) {
+      setTimeout(() => {
+        try {
+          ambulanceLeafletMap.invalidateSize();
+        } catch (e) {
+          console.warn('Map resize error:', e);
+        }
+      }, 250);
+    }
+
+    executeAmbulanceSearch();
+    renderRecentAmbulanceRequests();
+  }
+
+  window.showAmbulancePortal = showAmbulancePortal;
+
+  // --- 2. LEAFLET MAP INTEGRATION ---
+  function initAmbulanceMap() {
+    const mapEl = document.getElementById('ambulanceMap');
+    if (!mapEl || typeof L === 'undefined') return;
+    if (ambulanceLeafletMap) return;
+
+    try {
+      ambulanceLeafletMap = L.map('ambulanceMap', {
+        zoomControl: true,
+        scrollWheelZoom: false
+      }).setView(currentSearchCenter, 12);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+      }).addTo(ambulanceLeafletMap);
+
+      ambulanceMarkersLayer = L.layerGroup().addTo(ambulanceLeafletMap);
+    } catch (err) {
+      console.warn('Ambulance map init error:', err);
+    }
+  }
+
+  function renderAmbulanceMapMarkers(units, centerCoords) {
+    if (!ambulanceLeafletMap || !ambulanceMarkersLayer || typeof L === 'undefined') return;
+
+    ambulanceMarkersLayer.clearLayers();
+
+    const centerLat = centerCoords ? centerCoords[0] : 22.5697;
+    const centerLng = centerCoords ? centerCoords[1] : 88.3697;
+
+    // Search Center Pin
+    const userIcon = L.divIcon({
+      className: 'amb-custom-user-icon',
+      html: '<div class="amb-leaflet-pin amb-pin-user" title="Search Center / Pickup Area"><span style="font-size: 14px;">📍</span></div>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+
+    const userMarker = L.marker([centerLat, centerLng], { icon: userIcon })
+      .bindPopup(`<strong>📍 Search Area</strong><br>${escapeHtml(ambulanceLocationInput ? ambulanceLocationInput.value : 'Search Location')}`)
+      .addTo(ambulanceMarkersLayer);
+
+    const bounds = L.latLngBounds([[centerLat, centerLng]]);
+
+    units.forEach(amb => {
+      if (typeof amb.latitude !== 'number' || typeof amb.longitude !== 'number') return;
+
+      const pinClass = amb.status === 'AVAILABLE' ? 'amb-pin-available' : (amb.status === 'BUSY' ? 'amb-pin-busy' : 'amb-pin-offline');
+      const pinIcon = L.divIcon({
+        className: 'amb-custom-marker',
+        html: `<div class="amb-leaflet-pin ${pinClass}" title="${escapeHtml(amb.unitCode)} (${amb.status})"><span style="font-size: 14px;">🚑</span></div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -14]
+      });
+
+      const popupHtml = `
+        <div class="amb-leaflet-popup" style="min-width: 190px;">
+          <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; margin-bottom: 2px;" class="${pinClass}">${escapeHtml(amb.status)}</div>
+          <h4 style="margin: 0 0 2px; font-size: 0.95rem; color: #0f172a;">${escapeHtml(amb.unitCode)}</h4>
+          <p style="margin: 0 0 4px; font-size: 0.78rem; color: #64748b;">${escapeHtml(amb.typeName)}</p>
+          <div style="font-size: 0.8rem; margin-bottom: 8px;">
+            <span>📍 ${amb.distance.toFixed(1)} km</span> &middot; <span>⏱ ${escapeHtml(amb.eta)}</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.viewAmbulanceDetails('${escapeHtml(amb.id)}')">Details</button>
+            ${amb.status === 'AVAILABLE' ? `<button type="button" class="btn btn-emergency btn-sm" onclick="window.requestAmbulanceUnit('${escapeHtml(amb.id)}')">Request</button>` : ''}
+          </div>
+        </div>
+      `;
+
+      L.marker([amb.latitude, amb.longitude], { icon: pinIcon })
+        .bindPopup(popupHtml)
+        .addTo(ambulanceMarkersLayer);
+
+      bounds.extend([amb.latitude, amb.longitude]);
+    });
+
+    if (units.length > 0) {
+      ambulanceLeafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    } else {
+      ambulanceLeafletMap.setView([centerLat, centerLng], 12);
+    }
+  }
+
+  // --- 3. LOCATION & DISTANCE RESOLUTION ---
+  function resolveLocationCoordinates(query) {
+    if (!query) return [22.5697, 88.3697];
+    const q = query.trim().toLowerCase();
+
+    for (const [key, coords] of Object.entries(LOCATION_COORDS)) {
+      if (q.includes(key) || key.includes(q)) {
+        return coords;
+      }
+    }
+    return [22.5697, 88.3697];
+  }
+
+  function calculateAmbulanceETA(distKm) {
+    if (distKm <= 1.5) return '~4–7 min';
+    if (distKm <= 3.0) return '~6–9 min';
+    if (distKm <= 6.0) return '~9–14 min';
+    if (distKm <= 12.0) return '~14–22 min';
+    if (distKm <= 25.0) return '~25–40 min';
+    return `~${Math.round(distKm * 1.5)}–${Math.round(distKm * 2)} min`;
+  }
+
+  // --- 4. EXECUTE SEARCH & FILTERING ---
+  function executeAmbulanceSearch() {
+    if (!ambulanceCardsList) return;
+
+    const queryLocation = ambulanceLocationInput ? ambulanceLocationInput.value.trim() : 'Kolkata Central';
+    currentSearchCenter = resolveLocationCoordinates(queryLocation);
+
+    const radius = ambulanceRadiusSelect ? parseFloat(ambulanceRadiusSelect.value) || 5 : 5;
+    const availableOnly = ambulanceAvailableOnlyCheck ? ambulanceAvailableOnlyCheck.checked : true;
+    const sortVal = ambulanceSortSelect ? ambulanceSortSelect.value : 'distance_asc';
+
+    // Show loading skeleton briefly for feedback
+    if (ambulanceLoadingCard) ambulanceLoadingCard.hidden = false;
+    if (ambulanceEmptyCard) ambulanceEmptyCard.hidden = true;
+    ambulanceCardsList.hidden = true;
+
+    setTimeout(() => {
+      // Recalculate distance and ETA for all units
+      MOCK_AMBULANCES.forEach(amb => {
+        amb.distance = calculateDistance(currentSearchCenter[0], currentSearchCenter[1], amb.latitude, amb.longitude);
+        amb.eta = calculateAmbulanceETA(amb.distance);
+      });
+
+      // Filter
+      let filtered = MOCK_AMBULANCES.filter(amb => {
+        // Radius filter
+        if (amb.distance > radius) return false;
+
+        // Type filter
+        if (activeAmbulanceType !== 'all' && amb.type !== activeAmbulanceType) {
+          return false;
+        }
+
+        // Available only filter
+        if (availableOnly && amb.status !== 'AVAILABLE') {
+          return false;
+        }
+
+        return true;
+      });
+
+      // Sort
+      filtered.sort((a, b) => {
+        if (sortVal === 'distance_asc') {
+          return a.distance - b.distance;
+        }
+        if (sortVal === 'status_avail') {
+          const rank = { AVAILABLE: 0, BUSY: 1, OFFLINE: 2 };
+          return (rank[a.status] || 0) - (rank[b.status] || 0) || (a.distance - b.distance);
+        }
+        if (sortVal === 'eta_asc') {
+          return a.distance - b.distance;
+        }
+        if (sortVal === 'type_asc') {
+          return a.typeName.localeCompare(b.typeName);
+        }
+        return a.distance - b.distance;
+      });
+
+      // Update UI counts
+      if (ambulanceCountNum) ambulanceCountNum.textContent = filtered.length;
+      if (ambulanceRadiusLabel) ambulanceRadiusLabel.textContent = radius + ' km';
+
+      // Hide loading skeleton
+      if (ambulanceLoadingCard) ambulanceLoadingCard.hidden = true;
+
+      // Handle empty state vs results
+      if (filtered.length === 0) {
+        if (ambulanceEmptyCard) ambulanceEmptyCard.hidden = false;
+        ambulanceCardsList.hidden = true;
+        ambulanceCardsList.innerHTML = '';
+        if (ambulanceEmptyReasonText) {
+          ambulanceEmptyReasonText.textContent = `No ambulances found within ${radius} km for type "${activeAmbulanceType.toUpperCase()}". Expand search radius or toggle available units.`;
+        }
+      } else {
+        if (ambulanceEmptyCard) ambulanceEmptyCard.hidden = true;
+        ambulanceCardsList.hidden = false;
+        renderAmbulanceCards(filtered);
+      }
+
+      // Update map markers
+      renderAmbulanceMapMarkers(filtered, currentSearchCenter);
+    }, 220);
+  }
+
+  // --- 5. RENDER AMBULANCE CARDS ---
+  function renderAmbulanceCards(units) {
+    if (!ambulanceCardsList) return;
+
+    ambulanceCardsList.innerHTML = units.map(amb => {
+      const statusLabel = amb.status === 'AVAILABLE' ? '🟢 Available' : (amb.status === 'BUSY' ? '🟠 On Call' : '⚪ Offline');
+      const topEquip = amb.equipment.slice(0, 3);
+      const remainingCount = amb.equipment.length - 3;
+
+      return `
+        <article class="ambulance-card" data-id="${escapeHtml(amb.id)}">
+          <div class="amb-card-top">
+            <div class="amb-card-unit">
+              <span class="amb-type-pill pill-${escapeHtml(amb.type.toLowerCase())}">${escapeHtml(amb.type)}</span>
+              <div>
+                <h4 class="amb-unit-code">${escapeHtml(amb.unitCode)}</h4>
+                <span class="amb-provider-name">${escapeHtml(amb.provider)}</span>
+              </div>
+            </div>
+            <span class="amb-status-tag tag-${escapeHtml(amb.status.toLowerCase())}">${statusLabel}</span>
+          </div>
+
+          <div class="amb-card-metrics">
+            <div class="amb-metric-item">
+              <span class="amb-metric-icon">📍</span>
+              <div>
+                <strong class="amb-metric-val">${amb.distance.toFixed(1)} km</strong>
+                <span class="amb-metric-sub">${escapeHtml(amb.baseArea)}</span>
+              </div>
+            </div>
+            <div class="amb-metric-item">
+              <span class="amb-metric-icon">⏱️</span>
+              <div>
+                <strong class="amb-metric-val">${escapeHtml(amb.eta)}</strong>
+                <span class="amb-metric-sub">Est. Arrival (Demo)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="amb-card-equip">
+            <span class="amb-equip-label">Key Equipment:</span>
+            <div class="amb-equip-pills">
+              ${topEquip.map(eq => `<span class="amb-equip-pill">${escapeHtml(eq)}</span>`).join('')}
+              ${remainingCount > 0 ? `<span class="amb-equip-pill amb-equip-more">+${remainingCount} more</span>` : ''}
+            </div>
+          </div>
+
+          <div class="amb-card-actions">
+            <button type="button" class="btn btn-outline btn-sm amb-view-details-btn" data-id="${escapeHtml(amb.id)}">
+              📋 Details
+            </button>
+            ${amb.status === 'AVAILABLE' ? `
+              <button type="button" class="btn btn-emergency btn-sm amb-book-btn" data-id="${escapeHtml(amb.id)}">
+                🚑 Request Unit
+              </button>
+            ` : `
+              <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.65; cursor: not-allowed;">
+                ${amb.status === 'BUSY' ? '🟠 On Active Call' : '⚪ Unit Offline'}
+              </button>
+            `}
+            <a href="tel:112" class="btn btn-outline btn-sm amb-call-112-link" title="Call 112 Hotline">
+              📞 112
+            </a>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  // --- 6. RENDER RECENT REQUESTS ---
+  function renderRecentAmbulanceRequests() {
+    if (!ambulanceRecentList) return;
+
+    if (MOCK_RECENT_REQUESTS.length === 0) {
+      ambulanceRecentList.innerHTML = '<p style="color: var(--muted); font-size: 0.9rem;">No recent demo requests recorded yet.</p>';
+      return;
+    }
+
+    ambulanceRecentList.innerHTML = MOCK_RECENT_REQUESTS.map(req => {
+      return `
+        <div class="amb-recent-card">
+          <div class="amb-recent-head">
+            <span class="amb-recent-id">${escapeHtml(req.requestId)}</span>
+            <span class="amb-recent-status">${escapeHtml(req.status)}</span>
+          </div>
+          <div class="amb-recent-unit-row">
+            <strong>${escapeHtml(req.unitCode)}</strong> &middot; <span>${escapeHtml(req.type)}</span>
+          </div>
+          <div class="amb-recent-route">
+            <div class="amb-route-point">
+              <span class="amb-route-dot dot-from"></span>
+              <span>${escapeHtml(req.pickup)}</span>
+            </div>
+            <div class="amb-route-point">
+              <span class="amb-route-dot dot-to"></span>
+              <span>${escapeHtml(req.destination || 'Nearest Emergency Facility')}</span>
+            </div>
+          </div>
+          <div class="amb-recent-footer">
+            <span>👤 ${escapeHtml(req.patientName)}</span>
+            <span>⏱ ${escapeHtml(req.timeAgo || 'Just now')}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // --- 7. MODALS LOGIC ---
+  function openAmbulanceDetailsModal(ambId) {
+    const amb = MOCK_AMBULANCES.find(a => a.id === ambId);
+    if (!amb || !ambulanceDetailsModal) return;
+
+    activeAmbulanceForModal = amb;
+
+    if (ambDetailsTitle) ambDetailsTitle.textContent = amb.unitCode;
+    if (ambDetailsTypeBadge) ambDetailsTypeBadge.textContent = amb.typeName;
+    if (ambDetailsStatus) {
+      ambDetailsStatus.textContent = amb.status === 'AVAILABLE' ? '🟢 AVAILABLE' : (amb.status === 'BUSY' ? '🟠 ON ACTIVE CALL' : '⚪ OFFLINE');
+    }
+    if (ambDetailsEta) ambDetailsEta.textContent = `⏱ Estimated Arrival: ${amb.eta} (Demo)`;
+    if (ambDetailsReg) ambDetailsReg.textContent = amb.vehicleReg;
+    if (ambDetailsDistance) ambDetailsDistance.textContent = `${amb.distance.toFixed(1)} km away`;
+    if (ambDetailsProvider) ambDetailsProvider.textContent = amb.provider;
+    if (ambDetailsArea) ambDetailsArea.textContent = `${amb.baseArea}, ${amb.district}`;
+    if (ambDetailsCrew) ambDetailsCrew.textContent = amb.crew;
+
+    if (ambDetailsEquipmentList) {
+      ambDetailsEquipmentList.innerHTML = amb.equipment.map(eq => `<span class="amb-equip-pill">${escapeHtml(eq)}</span>`).join('');
+    }
+
+    if (ambDetailsRequestActionBtn) {
+      if (amb.status === 'AVAILABLE') {
+        ambDetailsRequestActionBtn.disabled = false;
+        ambDetailsRequestActionBtn.style.display = '';
+      } else {
+        ambDetailsRequestActionBtn.disabled = true;
+        ambDetailsRequestActionBtn.style.display = 'none';
+      }
+    }
+
+    ambulanceDetailsModal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeAmbulanceDetailsModal() {
+    if (ambulanceDetailsModal) ambulanceDetailsModal.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function openAmbulanceRequestModal(ambId) {
+    const amb = MOCK_AMBULANCES.find(a => a.id === ambId) || activeAmbulanceForModal;
+    if (!amb || !ambulanceRequestModal) return;
+
+    activeAmbulanceForModal = amb;
+
+    if (ambRequestUnitId) ambRequestUnitId.textContent = amb.unitCode;
+    if (ambRequestUnitType) ambRequestUnitType.textContent = amb.typeName;
+    if (ambRequestUnitDist) ambRequestUnitDist.textContent = `📍 ${amb.distance.toFixed(1)} km away`;
+    if (ambRequestUnitEta) ambRequestUnitEta.textContent = `⏱ ${amb.eta} (Demo)`;
+
+    // Pre-fill location
+    if (ambReqPickup && ambulanceLocationInput) {
+      ambReqPickup.value = ambulanceLocationInput.value.trim() || 'Kolkata';
+    }
+
+    // Set triage priority select
+    if (ambReqPrioritySelect) {
+      ambReqPrioritySelect.value = activeAmbulancePriority || 'Urgent';
+    }
+
+    ambulanceRequestModal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeAmbulanceRequestModal() {
+    if (ambulanceRequestModal) ambulanceRequestModal.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function openAmbulanceSuccessModal(reqRecord) {
+    if (!ambulanceSuccessModal) return;
+
+    if (ambSuccessId) ambSuccessId.textContent = reqRecord.requestId;
+    if (ambSuccessUnit) ambSuccessUnit.textContent = reqRecord.unitCode;
+    if (ambSuccessType) ambSuccessType.textContent = reqRecord.type;
+    if (ambSuccessStatus) ambSuccessStatus.textContent = reqRecord.status;
+    if (ambSuccessEta) ambSuccessEta.textContent = reqRecord.eta;
+    if (ambSuccessPickup) ambSuccessPickup.textContent = reqRecord.pickup;
+    if (ambSuccessDest) ambSuccessDest.textContent = reqRecord.destination || 'Nearest Emergency Department';
+
+    ambulanceSuccessModal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeAmbulanceSuccessModal() {
+    if (ambulanceSuccessModal) ambulanceSuccessModal.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  // Make globally available for onclick handlers in markers and cards
+  window.viewAmbulanceDetails = openAmbulanceDetailsModal;
+  window.requestAmbulanceUnit = openAmbulanceRequestModal;
+
+  // --- 8. EVENT LISTENERS WIRING ---
+
+  // Navigation and launcher buttons
+  [navAmbulanceBtn, navAmbulanceLink, mobileAmbulanceBtn, ambulanceLauncherBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showAmbulancePortal(true);
+      });
+    }
+  });
+
+  if (ambulanceBackHomeBtn) {
+    ambulanceBackHomeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToOriginalHome(true);
+    });
+  }
+
+  // Type selection cards toggle
+  ambTypeCards.forEach(card => {
+    card.addEventListener('click', () => {
+      ambTypeCards.forEach(c => {
+        c.classList.remove('active');
+        c.setAttribute('aria-checked', 'false');
+      });
+      card.classList.add('active');
+      card.setAttribute('aria-checked', 'true');
+      activeAmbulanceType = card.getAttribute('data-type') || 'all';
+      executeAmbulanceSearch();
+    });
+  });
+
+  // Priority radio pills
+  ambPriorityInputs.forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.amb-priority-pill').forEach(pill => pill.classList.remove('active'));
+      const parentPill = radio.closest('.amb-priority-pill');
+      if (parentPill) parentPill.classList.add('active');
+      activeAmbulancePriority = radio.value;
+    });
+  });
+
+  // Search form submit
+  if (ambulanceSearchForm) {
+    ambulanceSearchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      executeAmbulanceSearch();
+    });
+  }
+  if (ambulanceSearchBtn) {
+    ambulanceSearchBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      executeAmbulanceSearch();
+    });
+  }
+
+  // Location input enter key
+  if (ambulanceLocationInput) {
+    ambulanceLocationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        executeAmbulanceSearch();
+      }
+    });
+  }
+
+  // "Use My Location" simulation
+  if (ambulanceUseLocationBtn) {
+    ambulanceUseLocationBtn.addEventListener('click', () => {
+      if (!('geolocation' in navigator)) {
+        showToast('📍 Using standard Kolkata Central demo location.');
+        if (ambulanceLocationInput) ambulanceLocationInput.value = 'Kolkata Central';
+        if (ambulanceLocationHint) ambulanceLocationHint.textContent = 'Demo location set to Kolkata Central.';
+        executeAmbulanceSearch();
+        return;
+      }
+
+      ambulanceUseLocationBtn.disabled = true;
+      const originalText = ambulanceUseLocationBtn.innerHTML;
+      ambulanceUseLocationBtn.innerHTML = '⏳ Locating...';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          ambulanceUseLocationBtn.disabled = false;
+          ambulanceUseLocationBtn.innerHTML = originalText;
+          currentSearchCenter = [pos.coords.latitude, pos.coords.longitude];
+          if (ambulanceLocationInput) ambulanceLocationInput.value = 'My Current Location';
+          if (ambulanceLocationHint) ambulanceLocationHint.textContent = `📍 Geolocation detected (${pos.coords.latitude.toFixed(3)}, ${pos.coords.longitude.toFixed(3)})`;
+          showToast('📍 Current location detected. Updating nearby ambulances.');
+          executeAmbulanceSearch();
+        },
+        (err) => {
+          console.warn('Geolocation error:', err);
+          ambulanceUseLocationBtn.disabled = false;
+          ambulanceUseLocationBtn.innerHTML = originalText;
+          if (ambulanceLocationInput) ambulanceLocationInput.value = 'Kolkata Central';
+          if (ambulanceLocationHint) ambulanceLocationHint.textContent = 'Simulated near Kolkata Central / Park Street.';
+          showToast('📍 Location access simulated near Kolkata Central.');
+          executeAmbulanceSearch();
+        },
+        { timeout: 7000 }
+      );
+    });
+  }
+
+  // Radius, Available check, and Sort change
+  if (ambulanceRadiusSelect) {
+    ambulanceRadiusSelect.addEventListener('change', executeAmbulanceSearch);
+  }
+  if (ambulanceAvailableOnlyCheck) {
+    ambulanceAvailableOnlyCheck.addEventListener('change', executeAmbulanceSearch);
+  }
+  if (ambulanceSortSelect) {
+    ambulanceSortSelect.addEventListener('change', executeAmbulanceSearch);
+  }
+
+  // Reset filters
+  function resetAmbulanceFilters() {
+    if (ambulanceLocationInput) ambulanceLocationInput.value = 'Kolkata Central';
+    if (ambulanceRadiusSelect) ambulanceRadiusSelect.value = '5';
+    if (ambulanceAvailableOnlyCheck) ambulanceAvailableOnlyCheck.checked = true;
+    if (ambulanceSortSelect) ambulanceSortSelect.value = 'distance_asc';
+
+    ambTypeCards.forEach(c => {
+      c.classList.remove('active');
+      c.setAttribute('aria-checked', 'false');
+    });
+    const defaultType = document.querySelector('.amb-type-card[data-type="all"]');
+    if (defaultType) {
+      defaultType.classList.add('active');
+      defaultType.setAttribute('aria-checked', 'true');
+    }
+    activeAmbulanceType = 'all';
+
+    if (ambulanceLocationHint) ambulanceLocationHint.textContent = 'Sample location prefilled for demonstration.';
+    executeAmbulanceSearch();
+  }
+
+  if (ambulanceResetSearchBtn) ambulanceResetSearchBtn.addEventListener('click', resetAmbulanceFilters);
+  if (ambulanceResetFiltersBtn) ambulanceResetFiltersBtn.addEventListener('click', resetAmbulanceFilters);
+
+  if (ambulanceExpandRadiusBtn) {
+    ambulanceExpandRadiusBtn.addEventListener('click', () => {
+      if (ambulanceRadiusSelect) ambulanceRadiusSelect.value = '25';
+      executeAmbulanceSearch();
+    });
+  }
+
+  // Card delegation for Details and Request buttons
+  if (ambulanceCardsList) {
+    ambulanceCardsList.addEventListener('click', (e) => {
+      const detailsBtn = e.target.closest('.amb-view-details-btn');
+      if (detailsBtn) {
+        const id = detailsBtn.getAttribute('data-id');
+        openAmbulanceDetailsModal(id);
+        return;
+      }
+
+      const bookBtn = e.target.closest('.amb-book-btn');
+      if (bookBtn) {
+        const id = bookBtn.getAttribute('data-id');
+        openAmbulanceRequestModal(id);
+        return;
+      }
+    });
+  }
+
+  // Details Modal close and action buttons
+  if (ambDetailsCloseBtn) ambDetailsCloseBtn.addEventListener('click', closeAmbulanceDetailsModal);
+  if (ambDetailsCancelBtn) ambDetailsCancelBtn.addEventListener('click', closeAmbulanceDetailsModal);
+  if (ambulanceDetailsModal) {
+    ambulanceDetailsModal.addEventListener('click', (e) => {
+      if (e.target === ambulanceDetailsModal) closeAmbulanceDetailsModal();
+    });
+  }
+  if (ambDetailsRequestActionBtn) {
+    ambDetailsRequestActionBtn.addEventListener('click', () => {
+      closeAmbulanceDetailsModal();
+      if (activeAmbulanceForModal) {
+        openAmbulanceRequestModal(activeAmbulanceForModal.id);
+      }
+    });
+  }
+
+  // Request Modal close and cancel buttons
+  if (ambRequestCloseBtn) ambRequestCloseBtn.addEventListener('click', closeAmbulanceRequestModal);
+  if (ambRequestCancelBtn) ambRequestCancelBtn.addEventListener('click', closeAmbulanceRequestModal);
+  if (ambulanceRequestModal) {
+    ambulanceRequestModal.addEventListener('click', (e) => {
+      if (e.target === ambulanceRequestModal) closeAmbulanceRequestModal();
+    });
+  }
+
+  // Request Form submission
+  if (ambulanceConfirmForm) {
+    ambulanceConfirmForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const patientName = ambReqPatientName ? ambReqPatientName.value.trim() : '';
+      const phone = ambReqPhone ? ambReqPhone.value.trim() : '';
+      const pickup = ambReqPickup ? ambReqPickup.value.trim() : '';
+      const dest = ambReqDestination ? ambReqDestination.value.trim() : '';
+      const priority = ambReqPrioritySelect ? ambReqPrioritySelect.value : 'Urgent';
+
+      if (!patientName || !phone || !pickup) {
+        showToast('⚠️ Please complete all required patient and pickup fields.');
+        return;
+      }
+
+      if (ambRequestSubmitBtn) {
+        ambRequestSubmitBtn.disabled = true;
+        ambRequestSubmitBtn.textContent = 'Recording Request...';
+      }
+
+      setTimeout(() => {
+        const newRequestId = `DEMO-AMB-${Math.floor(10000 + Math.random() * 90000)}`;
+        const selectedAmb = activeAmbulanceForModal || MOCK_AMBULANCES[0];
+
+        const newRecord = {
+          requestId: newRequestId,
+          unitCode: selectedAmb.unitCode,
+          type: selectedAmb.typeName,
+          patientName: patientName,
+          pickup: pickup,
+          destination: dest || 'Nearest Emergency Center',
+          priority: priority,
+          status: 'Dispatched (Demo)',
+          eta: selectedAmb.eta,
+          timeAgo: 'Just now'
+        };
+
+        MOCK_RECENT_REQUESTS.unshift(newRecord);
+        renderRecentAmbulanceRequests();
+
+        if (ambRequestSubmitBtn) {
+          ambRequestSubmitBtn.disabled = false;
+          ambRequestSubmitBtn.textContent = '🚑 CONFIRM DEMO REQUEST';
+        }
+
+        closeAmbulanceRequestModal();
+        openAmbulanceSuccessModal(newRecord);
+        showToast(`🚑 Demo request ${newRequestId} submitted successfully!`);
+      }, 350);
+    });
+  }
+
+  // Success Modal close
+  if (ambSuccessCloseBtn) ambSuccessCloseBtn.addEventListener('click', closeAmbulanceSuccessModal);
+  if (ambulanceSuccessModal) {
+    ambulanceSuccessModal.addEventListener('click', (e) => {
+      if (e.target === ambulanceSuccessModal) closeAmbulanceSuccessModal();
+    });
+  }
+
+  // Global Escape key for ambulance modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (ambulanceDetailsModal && !ambulanceDetailsModal.hidden) closeAmbulanceDetailsModal();
+      if (ambulanceRequestModal && !ambulanceRequestModal.hidden) closeAmbulanceRequestModal();
+      if (ambulanceSuccessModal && !ambulanceSuccessModal.hidden) closeAmbulanceSuccessModal();
+    }
+  });
+
+  // Check initial hash on load for #ambulance
+  if (window.location.hash === '#ambulance') {
+    showAmbulancePortal(false);
   }
 
   /* -----------------------------------------------------
@@ -5492,6 +6798,9 @@
       } else if (action === 'medical_shops') {
         toggleRakshakChat(false);
         showMedicalShopPortal(false);
+      } else if (action === 'ambulance' || action === 'find_ambulance') {
+        toggleRakshakChat(false);
+        showAmbulancePortal(true);
       } else if (action === 'patient_intake') {
         toggleRakshakChat(false);
         const intakeSec = document.getElementById('emergency-patient-intake');

@@ -43,12 +43,16 @@
       <a href="#map-section">Map</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
+      <a href="#ambulance" id="navAmbulanceLink" class="nav-ambulance-link">🚑 Live Ambulance</a>
       <a href="#blood-bank" id="navBloodBankLink" class="nav-blood-link">🩸 Blood Bank</a>
       <a href="#medical-shops" id="navMedicalShopLink" class="nav-medical-link">💊 24×7 Medical Shop</a>
       <a href="#staff-portal" id="navStaffPortalBtn" class="nav-staff-link">🔐 Staff Portal</a>
     </nav>
 
     <div class="navbar-actions">
+      <a href="#ambulance" class="btn btn-ambulance btn-sm" id="navAmbulanceBtn" aria-label="Open Live Ambulance Finder">
+        🚑 <span>Ambulance</span>
+      </a>
       <a href="#blood-bank" class="btn btn-blood btn-sm" id="navBloodBankBtn" aria-label="Open Blood Bank Portal">
         🩸 <span>Blood Bank</span>
       </a>
@@ -82,6 +86,7 @@
 
   <div class="mobile-menu" id="mobileMenu">
     <a href="#main-content" id="mobileHomeBtn">Home</a>
+    <a href="#ambulance" id="mobileAmbulanceBtn" style="color: #dc2626; font-weight: 700;">🚑 Live Ambulance Finder</a>
     <a href="#find-beds">Find Beds</a>
     <a href="#blood-bank" id="mobileBloodBankBtn" style="color: #e11d48; font-weight: 700;">🩸 Blood Bank Portal</a>
     <a href="#medical-shops" id="mobileMedicalShopBtn" style="color: #059669; font-weight: 700;">💊 24×7 Medical Shop</a>
@@ -467,6 +472,346 @@
           We could not find any 24×7 medical shops matching your search filters. Try selecting a different district or clearing your search term.
         </p>
         <button type="button" class="btn btn-outline" id="pharmacyEmptyResetBtn">VIEW ALL 24×7 MEDICAL SHOPS</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2.7 LIVE AMBULANCE FINDER PORTAL ================= -->
+  <section class="ambulance-portal" id="ambulancePortal" hidden aria-labelledby="ambulancePortalHeading">
+    <!-- Top Action Navigation Bar -->
+    <div class="ambulance-top-nav">
+      <div class="ambulance-top-nav-inner">
+        <button type="button" class="btn btn-outline btn-sm ambulance-back-btn" id="ambulanceBackHomeBtn" aria-label="Return to Hospital Bed Tracker">
+          ← Back to Hospital Beds
+        </button>
+        <div class="ambulance-fleet-tag">
+          <span class="amb-live-dot" aria-hidden="true"></span>
+          <span>🚑 West Bengal Emergency Ambulance Fleet · Dispatch Network</span>
+        </div>
+        <a href="tel:112" class="btn btn-emergency-alt btn-sm" aria-label="Call emergency 112">
+          📞 <span>CALL 112</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Ambulance Hero Section -->
+    <div class="ambulance-portal-hero">
+      <div class="ambulance-hero-inner">
+        <div class="ambulance-badge-tag">
+          <span>🚑</span> Fast Medical Transportation · 24×7 Network
+        </div>
+        <h1 id="ambulancePortalHeading">Live Ambulance Finder</h1>
+        <p class="ambulance-hero-sub">
+          Find nearby ambulance services and quickly request emergency transportation across West Bengal.
+        </p>
+
+        <!-- Prominent Safety & Demo Notice -->
+        <div class="ambulance-demo-alert-banner" role="alert">
+          <div class="amb-alert-icon" aria-hidden="true">⚠️</div>
+          <div class="amb-alert-content">
+            <strong>DEMO MODE</strong> — Ambulance availability and locations shown here are sample data. Real-time GPS and hospital dispatch will be connected later. For acute life-threatening situations, <strong>call 112 immediately</strong>.
+          </div>
+        </div>
+
+        <!-- Statewide Fleet Metrics -->
+        <div class="ambulance-stats-grid" id="ambulancePortalMetrics">
+          <div class="ambulance-stat-card">
+            <span class="ambulance-stat-icon">🚑</span>
+            <div class="ambulance-stat-info">
+              <span class="ambulance-stat-num" id="statTotalAmbulances">28+</span>
+              <span class="ambulance-stat-lbl">Active Sample Fleet</span>
+            </div>
+          </div>
+          <div class="ambulance-stat-card">
+            <span class="ambulance-stat-icon">⏱️</span>
+            <div class="ambulance-stat-info">
+              <span class="ambulance-stat-num">8–15 min</span>
+              <span class="ambulance-stat-lbl">Estimated Demo ETA</span>
+            </div>
+          </div>
+          <div class="ambulance-stat-card">
+            <span class="ambulance-stat-icon">📍</span>
+            <div class="ambulance-stat-info">
+              <span class="ambulance-stat-num">23 Districts</span>
+              <span class="ambulance-stat-lbl">Statewide Coverage</span>
+            </div>
+          </div>
+          <div class="ambulance-stat-card">
+            <span class="ambulance-stat-icon">📞</span>
+            <div class="ambulance-stat-info">
+              <span class="ambulance-stat-num">112 Integrated</span>
+              <span class="ambulance-stat-lbl">Emergency Response</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Container: Search Panel, Results, and Map -->
+    <div class="ambulance-portal-content">
+      <!-- Search Card -->
+      <div class="ambulance-search-card" id="ambulanceSearchCard">
+        <div class="amb-card-header">
+          <div class="amb-header-title-wrap">
+            <span class="amb-header-icon" aria-hidden="true">📍</span>
+            <div>
+              <h2 class="amb-card-title">Find Nearest Ambulance</h2>
+              <p class="amb-card-subtitle">Select your location, required medical equipment, and urgency</p>
+            </div>
+          </div>
+          <div class="amb-header-badge">
+            <span>Demo Mode Active</span>
+          </div>
+        </div>
+
+        <form id="ambulanceSearchForm" class="ambulance-search-form" onsubmit="event.preventDefault();">
+          <!-- Location and Radius Row -->
+          <div class="amb-form-grid">
+            <div class="amb-form-group amb-location-group">
+              <label for="ambulanceLocationInput" class="amb-form-label">
+                Location / Area <span class="amb-req">*</span>
+              </label>
+              <div class="amb-input-btn-wrap">
+                <input
+                  type="text"
+                  id="ambulanceLocationInput"
+                  class="amb-form-input"
+                  placeholder="Enter area, landmark, hospital or city (e.g. Jamshedpur, Park Street, Salt Lake)"
+                  value="Kolkata Central"
+                  autocomplete="off"
+                />
+                <button type="button" class="btn btn-secondary btn-sm" id="ambulanceUseLocationBtn" title="Use My Location (Demo)">
+                  📍 Use My Location
+                </button>
+              </div>
+              <span class="amb-field-hint" id="ambulanceLocationHint">Sample location prefilled for demonstration.</span>
+            </div>
+
+            <div class="amb-form-group amb-radius-group">
+              <label for="ambulanceRadiusSelect" class="amb-form-label">
+                Search Radius
+              </label>
+              <select id="ambulanceRadiusSelect" class="amb-form-select">
+                <option value="2">Within 2 km (Immediate Proximity)</option>
+                <option value="5" selected>Within 5 km (Standard)</option>
+                <option value="10">Within 10 km (Expanded City)</option>
+                <option value="25">Within 25 km (Sub-Divisional)</option>
+                <option value="50">Within 50 km (Inter-District)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Ambulance Type Selection -->
+          <div class="amb-types-section">
+            <label class="amb-form-label">
+              What type of ambulance do you need?
+            </label>
+            <div class="amb-types-grid" role="radiogroup" aria-label="Ambulance Type Selection">
+              <button type="button" class="amb-type-card active" data-type="all" aria-checked="true" role="radio">
+                <span class="amb-type-icon">🚑</span>
+                <span class="amb-type-title">All Types</span>
+                <span class="amb-type-sub">Any available unit</span>
+              </button>
+              <button type="button" class="amb-type-card" data-type="BLS" aria-checked="false" role="radio">
+                <span class="amb-type-icon">🩺</span>
+                <span class="amb-type-title">Basic Life Support</span>
+                <span class="amb-type-sub">BLS · Oxygen, Stretcher</span>
+              </button>
+              <button type="button" class="amb-type-card" data-type="ALS" aria-checked="false" role="radio">
+                <span class="amb-type-icon">⚡</span>
+                <span class="amb-type-title">Advanced Life Support</span>
+                <span class="amb-type-sub">ALS · Cardiac Monitor, EMT</span>
+              </button>
+              <button type="button" class="amb-type-card" data-type="ICU" aria-checked="false" role="radio">
+                <span class="amb-type-icon">🫁</span>
+                <span class="amb-type-title">ICU / Critical Care</span>
+                <span class="amb-type-sub">ICU · Ventilator, Doctor</span>
+              </button>
+              <button type="button" class="amb-type-card" data-type="PT" aria-checked="false" role="radio">
+                <span class="amb-type-icon">🦽</span>
+                <span class="amb-type-title">Patient Transport</span>
+                <span class="amb-type-sub">Non-Emergency Transfer</span>
+              </button>
+              <button type="button" class="amb-type-card" data-type="NICU" aria-checked="false" role="radio">
+                <span class="amb-type-icon">👶</span>
+                <span class="amb-type-title">Neonatal / NICU</span>
+                <span class="amb-type-sub">Incubator, Pediatric</span>
+              </button>
+              <button type="button" class="amb-type-card" data-type="MORTUARY" aria-checked="false" role="radio">
+                <span class="amb-type-icon">🕊️</span>
+                <span class="amb-type-title">Mortuary</span>
+                <span class="amb-type-sub">Freezer Fitted Van</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Emergency Priority Selection -->
+          <div class="amb-priority-section">
+            <div class="amb-priority-header">
+              <label class="amb-form-label" style="margin-bottom: 0;">
+                Emergency Priority
+              </label>
+              <span class="amb-priority-disclaimer">⚠️ For life-threatening emergencies, call 112 immediately.</span>
+            </div>
+            <div class="amb-priority-group" role="radiogroup" aria-label="Emergency Priority">
+              <label class="amb-priority-pill pill-critical">
+                <input type="radio" name="ambPriority" value="Critical" />
+                <span class="amb-priority-indicator">🔴 Critical</span>
+                <span class="amb-priority-desc">Severe trauma, cardiac, respiratory failure</span>
+              </label>
+              <label class="amb-priority-pill pill-urgent active">
+                <input type="radio" name="ambPriority" value="Urgent" checked />
+                <span class="amb-priority-indicator">🟠 Urgent</span>
+                <span class="amb-priority-desc">Acute pain, fracture, medical transfer</span>
+              </label>
+              <label class="amb-priority-pill pill-noncritical">
+                <input type="radio" name="ambPriority" value="Non-Critical" />
+                <span class="amb-priority-indicator">🟢 Non-Critical</span>
+                <span class="amb-priority-desc">Routine admission, discharge, scheduled</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Submit Action Bar -->
+          <div class="amb-search-actions">
+            <button type="submit" class="btn btn-emergency btn-lg amb-search-submit-btn" id="ambulanceSearchBtn">
+              🔎 SEARCH NEAREST AMBULANCE
+            </button>
+            <button type="button" class="btn btn-outline btn-lg" id="ambulanceResetSearchBtn">
+              Reset Filters
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Results and Map Split Layout -->
+      <div class="ambulance-results-layout">
+        <!-- Left Column: Search Results List -->
+        <div class="ambulance-results-column">
+          <!-- Results Header & Sort/Filter Controls -->
+          <div class="amb-results-control-bar">
+            <div class="amb-results-meta">
+              <h3 class="amb-results-title">Nearby Ambulances</h3>
+              <p class="amb-results-count" id="ambulanceResultsCountText">
+                Showing <strong id="ambulanceCountNum">0</strong> ambulances within <strong id="ambulanceRadiusLabel">5 km</strong>
+              </p>
+            </div>
+
+            <div class="amb-filter-controls">
+              <!-- Available only toggle -->
+              <label class="amb-checkbox-label">
+                <input type="checkbox" id="ambulanceAvailableOnlyCheck" checked />
+                <span>Available Units Only</span>
+              </label>
+
+              <!-- Sort select -->
+              <div class="amb-sort-wrap">
+                <label for="ambulanceSortSelect" class="visually-hidden">Sort Ambulances</label>
+                <select id="ambulanceSortSelect" class="amb-sort-select">
+                  <option value="distance_asc">Sort: Nearest Distance</option>
+                  <option value="status_avail">Sort: Availability</option>
+                  <option value="eta_asc">Sort: Estimated Arrival</option>
+                  <option value="type_asc">Sort: Ambulance Type</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading State (hidden by default) -->
+          <div class="ambulance-loading-card" id="ambulanceLoadingCard" hidden aria-live="polite">
+            <div class="amb-loading-spinner" aria-hidden="true"></div>
+            <h4>Searching nearby ambulances...</h4>
+            <p>Scanning regional emergency fleet and computing demo arrival times.</p>
+          </div>
+
+          <!-- Empty State (hidden by default) -->
+          <div class="ambulance-empty-card" id="ambulanceEmptyCard" hidden aria-live="polite">
+            <span class="amb-empty-icon" aria-hidden="true">🚑</span>
+            <h4>No nearby ambulances found</h4>
+            <p id="ambulanceEmptyReasonText">
+              No matching ambulances found within the selected radius. Try expanding your search distance or clearing the type filter.
+            </p>
+            <div class="amb-empty-actions">
+              <button type="button" class="btn btn-emergency btn-sm" id="ambulanceExpandRadiusBtn">
+                📍 Expand to 25 km
+              </button>
+              <button type="button" class="btn btn-outline btn-sm" id="ambulanceResetFiltersBtn">
+                Reset All Filters
+              </button>
+              <a href="tel:112" class="btn btn-emergency-alt btn-sm">
+                📞 Call 112 Hotline
+              </a>
+            </div>
+          </div>
+
+          <!-- Dynamic Ambulance Cards Grid -->
+          <div class="ambulance-cards-grid" id="ambulanceCardsList" role="list">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <!-- Right Column: Interactive Map Preview -->
+        <div class="ambulance-map-column">
+          <div class="ambulance-map-card">
+            <div class="amb-map-header">
+              <div class="amb-map-title-row">
+                <span class="amb-map-icon" aria-hidden="true">🗺️</span>
+                <h3 class="amb-map-title">Nearby Ambulance Locations</h3>
+              </div>
+              <span class="amb-demo-chip">DEMO MAP · Locations Illustrative</span>
+            </div>
+
+            <!-- Leaflet Map Container -->
+            <div id="ambulanceMap" class="ambulance-map-viewport" aria-label="Interactive map showing nearby ambulances"></div>
+
+            <!-- Map Legend -->
+            <div class="ambulance-map-legend">
+              <div class="amb-legend-item">
+                <span class="amb-legend-dot dot-available" aria-hidden="true"></span>
+                <span>Available</span>
+              </div>
+              <div class="amb-legend-item">
+                <span class="amb-legend-dot dot-busy" aria-hidden="true"></span>
+                <span>Busy</span>
+              </div>
+              <div class="amb-legend-item">
+                <span class="amb-legend-dot dot-offline" aria-hidden="true"></span>
+                <span>Offline</span>
+              </div>
+              <div class="amb-legend-item">
+                <span class="amb-legend-dot dot-user" aria-hidden="true"></span>
+                <span>Pickup / Search Area</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Requests History Section -->
+      <div class="ambulance-recent-section">
+        <div class="amb-recent-header">
+          <div>
+            <h3 class="amb-recent-title">📋 Recent Ambulance Requests</h3>
+            <p class="amb-recent-sub">Demonstration of recorded ambulance dispatch calls and status tracking.</p>
+          </div>
+          <span class="amb-demo-badge">Demo Records</span>
+        </div>
+
+        <div class="ambulance-recent-grid" id="ambulanceRecentList">
+          <!-- Dynamically populated via JS with initial mock items + user confirmed items -->
+        </div>
+      </div>
+
+      <!-- Bottom Emergency Hotline Strip -->
+      <div class="ambulance-bottom-safety-strip">
+        <div class="amb-safety-icon" aria-hidden="true">🚨</div>
+        <div class="amb-safety-copy">
+          <strong>Life-Threatening Acute Medical Emergency?</strong>
+          <span>Do not delay waiting for an online confirmation. Dial the <strong>112 National Emergency Hotline</strong> or <strong>102 Ambulance Dispatch</strong> right away.</span>
+        </div>
+        <a href="tel:112" class="btn btn-emergency-alt btn-md">
+          📞 CALL 112 NOW
+        </a>
       </div>
     </div>
   </section>
@@ -2088,6 +2433,18 @@
   </div>
 </div>
 
+<!-- ================= LIVE AMBULANCE — FLOATING LAUNCHER FAB ================= -->
+<button type="button" class="ambulance-launcher-fab" id="ambulanceLauncherBtn" aria-label="Open Live Ambulance Finder" aria-controls="ambulancePortal">
+  <span class="amb-fab-icon-wrap" aria-hidden="true">
+    <span class="amb-fab-icon">🚑</span>
+    <span class="amb-fab-pulse"></span>
+  </span>
+  <span class="amb-fab-label">
+    <span class="amb-fab-badge">24×7 DISPATCH</span>
+    <span class="amb-fab-name">Live Ambulance</span>
+  </span>
+</button>
+
 <!-- ================= DR. RAKSHAK — AI HEALTH ASSISTANT CHATBOT WIDGET ================= -->
 <!-- Floating Launcher FAB -->
 <button type="button" class="rakshak-launcher-fab" id="rakshakLauncherBtn" aria-label="Open Dr. Rakshak AI Health Assistant" aria-expanded="false" aria-controls="rakshakChatWidget">
@@ -2267,6 +2624,223 @@
     <div class="modal-footer" style="display: flex; justify-content: center; gap: 8px;">
       <button type="button" class="btn btn-ghost" id="rakshakResetCancelBtn">Cancel</button>
       <button type="button" class="btn btn-primary" id="rakshakResetConfirmBtn">New Chat</button>
+    </div>
+  </div>
+<!-- ================= LIVE AMBULANCE DETAILS MODAL ================= -->
+<div class="modal-overlay" id="ambulanceDetailsModal" hidden>
+  <div class="modal ambulance-modal" role="dialog" aria-modal="true" aria-labelledby="ambDetailsTitle">
+    <div class="amb-modal-header">
+      <div class="amb-modal-title-row">
+        <span class="amb-modal-icon" aria-hidden="true">🚑</span>
+        <div>
+          <h3 id="ambDetailsTitle" class="amb-modal-id">WB-01-2045</h3>
+          <span class="amb-modal-type-badge" id="ambDetailsTypeBadge">Advanced Life Support (ALS)</span>
+        </div>
+      </div>
+      <button type="button" class="amb-modal-close-btn" id="ambDetailsCloseBtn" aria-label="Close ambulance details">✕</button>
+    </div>
+
+    <div class="amb-modal-body">
+      <!-- Status & ETA Banner -->
+      <div class="amb-modal-status-banner">
+        <div class="amb-modal-status" id="ambDetailsStatus">🟢 AVAILABLE</div>
+        <div class="amb-modal-eta" id="ambDetailsEta">⏱ Estimated Arrival: ~8–12 min (Demo)</div>
+      </div>
+
+      <!-- Quick Specs Grid -->
+      <div class="amb-specs-grid">
+        <div class="amb-spec-item">
+          <span class="amb-spec-lbl">Registration No.</span>
+          <span class="amb-spec-val" id="ambDetailsReg">WB01A2045</span>
+        </div>
+        <div class="amb-spec-item">
+          <span class="amb-spec-lbl">Distance</span>
+          <span class="amb-spec-val" id="ambDetailsDistance">2.4 km away</span>
+        </div>
+        <div class="amb-spec-item">
+          <span class="amb-spec-lbl">Service Provider</span>
+          <span class="amb-spec-val" id="ambDetailsProvider">Demo Emergency Services</span>
+        </div>
+        <div class="amb-spec-item">
+          <span class="amb-spec-lbl">Base Station / Area</span>
+          <span class="amb-spec-val" id="ambDetailsArea">Kolkata Central</span>
+        </div>
+      </div>
+
+      <!-- Certified Medical Equipment -->
+      <div class="amb-equipment-section">
+        <h4 class="amb-section-title">Onboard Emergency Equipment</h4>
+        <div class="amb-equipment-tags" id="ambDetailsEquipmentList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Crew Information -->
+      <div class="amb-crew-section">
+        <h4 class="amb-section-title">Designated Response Crew (Demo)</h4>
+        <div class="amb-crew-card">
+          <div class="amb-crew-avatar" aria-hidden="true">👨‍⚕️</div>
+          <div class="amb-crew-info">
+            <span class="amb-crew-name" id="ambDetailsCrew">EMT-Paramedic &amp; Emergency Driver (Demo)</span>
+            <span class="amb-crew-desc">BLS/ACLS Certified · Emergency First Responder</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demo Contact Warning -->
+      <div class="amb-demo-phone-box">
+        <div>
+          <strong>Demo Contact Option:</strong>
+          <p style="margin: 2px 0 0; font-size: 0.85rem; color: var(--muted);">Direct driver phone connectivity is simulated in demo mode.</p>
+        </div>
+        <a href="tel:112" class="btn btn-outline btn-sm">📞 Call 112</a>
+      </div>
+    </div>
+
+    <div class="amb-modal-footer">
+      <button type="button" class="btn btn-secondary" id="ambDetailsCancelBtn">Close</button>
+      <button type="button" class="btn btn-emergency" id="ambDetailsRequestActionBtn">
+        🚑 Request This Ambulance
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= LIVE AMBULANCE REQUEST CONFIRMATION MODAL ================= -->
+<div class="modal-overlay" id="ambulanceRequestModal" hidden>
+  <div class="modal ambulance-modal" role="dialog" aria-modal="true" aria-labelledby="ambRequestTitle">
+    <div class="amb-modal-header">
+      <div class="amb-modal-title-row">
+        <span class="amb-modal-icon" aria-hidden="true">🚑</span>
+        <div>
+          <h3 id="ambRequestTitle" class="amb-modal-id">Request Ambulance</h3>
+          <span class="amb-modal-type-badge">Fast Dispatch Confirmation</span>
+        </div>
+      </div>
+      <button type="button" class="amb-modal-close-btn" id="ambRequestCloseBtn" aria-label="Close request form">✕</button>
+    </div>
+
+    <!-- Selected Ambulance Banner -->
+    <div class="amb-selected-banner" id="ambRequestSelectedBanner">
+      <div class="amb-selected-info">
+        <strong id="ambRequestUnitId">WB-01-2045</strong>
+        <span id="ambRequestUnitType">Advanced Life Support (ALS)</span>
+      </div>
+      <div class="amb-selected-meta">
+        <span id="ambRequestUnitDist">📍 2.4 km away</span>
+        <span id="ambRequestUnitEta">⏱ ~8–12 min (Demo)</span>
+      </div>
+    </div>
+
+    <form id="ambulanceConfirmForm" class="amb-request-form" onsubmit="event.preventDefault();">
+      <div class="amb-modal-body">
+        <div class="amb-req-field">
+          <label for="ambReqPatientName" class="amb-form-label">Patient Full Name <span class="amb-req">*</span></label>
+          <input type="text" id="ambReqPatientName" class="amb-form-input" required placeholder="e.g. Ramesh Chandra Sen" />
+        </div>
+
+        <div class="amb-req-field">
+          <label for="ambReqPhone" class="amb-form-label">Patient / Attendant Mobile Number <span class="amb-req">*</span></label>
+          <input type="tel" id="ambReqPhone" class="amb-form-input" required placeholder="10-digit Indian mobile number (e.g. 9830012345)" pattern="[0-9]{10}" />
+        </div>
+
+        <div class="amb-req-field">
+          <label for="ambReqPickup" class="amb-form-label">Exact Pickup Address / Landmark <span class="amb-req">*</span></label>
+          <input type="text" id="ambReqPickup" class="amb-form-input" required placeholder="Apartment / House, Street, Nearest Landmark, Area" />
+        </div>
+
+        <div class="amb-req-field">
+          <label for="ambReqDestination" class="amb-form-label">Destination Hospital (Optional)</label>
+          <input type="text" id="ambReqDestination" class="amb-form-input" placeholder="e.g. Apollo Multispeciality, SSKM, Nearest Emergency" />
+        </div>
+
+        <div class="amb-req-field">
+          <label for="ambReqPrioritySelect" class="amb-form-label">Urgency / Triage Priority</label>
+          <select id="ambReqPrioritySelect" class="amb-form-select">
+            <option value="Critical">🔴 Critical (Life-threatening / Cardiac / Trauma)</option>
+            <option value="Urgent" selected>🟠 Urgent (Acute pain / Oxygen required)</option>
+            <option value="Non-Critical">🟢 Non-Critical (Hospital transfer / Stable)</option>
+          </select>
+        </div>
+
+        <div class="amb-req-field">
+          <label for="ambReqNotes" class="amb-form-label">Additional Dispatch Notes (Optional)</label>
+          <textarea id="ambReqNotes" class="amb-form-textarea" rows="2" placeholder="e.g. 3rd floor without elevator, oxygen required during transit, patient unconscious"></textarea>
+        </div>
+
+        <div class="amb-demo-sub-disclaimer">
+          <span>⚠️ <strong>Demo Dispatch Notice:</strong> This request is recorded locally as a demonstration. For real-time emergency triage, please also call <strong>112</strong>.</span>
+        </div>
+      </div>
+
+      <div class="amb-modal-footer">
+        <button type="button" class="btn btn-secondary" id="ambRequestCancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-emergency" id="ambRequestSubmitBtn">
+          🚑 CONFIRM DEMO REQUEST
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= LIVE AMBULANCE REQUEST SUCCESS MODAL ================= -->
+<div class="modal-overlay" id="ambulanceSuccessModal" hidden>
+  <div class="modal ambulance-modal amb-success-modal" role="dialog" aria-modal="true" aria-labelledby="ambSuccessTitle">
+    <div class="amb-success-header">
+      <div class="amb-success-badge-icon" aria-hidden="true">🚑</div>
+      <h3 id="ambSuccessTitle" class="amb-success-title">Ambulance Request Created</h3>
+      <p class="amb-success-subtitle">Your demo emergency transportation request has been recorded.</p>
+    </div>
+
+    <div class="amb-success-body">
+      <!-- Request ID Card -->
+      <div class="amb-req-id-card">
+        <span class="amb-req-id-lbl">DEMO REQUEST ID</span>
+        <span class="amb-req-id-val" id="ambSuccessId">DEMO-AMB-10482</span>
+      </div>
+
+      <!-- Request Summary Grid -->
+      <div class="amb-success-summary-grid">
+        <div class="amb-success-item">
+          <span class="amb-success-lbl">Ambulance Unit</span>
+          <strong class="amb-success-val" id="ambSuccessUnit">WB-01-2045</strong>
+        </div>
+        <div class="amb-success-item">
+          <span class="amb-success-lbl">Ambulance Type</span>
+          <strong class="amb-success-val" id="ambSuccessType">Advanced Life Support (ALS)</strong>
+        </div>
+        <div class="amb-success-item">
+          <span class="amb-success-lbl">Status</span>
+          <span class="amb-status-chip chip-waiting" id="ambSuccessStatus">🟠 Awaiting Confirmation (Demo)</span>
+        </div>
+        <div class="amb-success-item">
+          <span class="amb-success-lbl">Demo ETA</span>
+          <strong class="amb-success-val" id="ambSuccessEta">~8–12 min</strong>
+        </div>
+        <div class="amb-success-item amb-item-full">
+          <span class="amb-success-lbl">Pickup Location</span>
+          <span class="amb-success-val" id="ambSuccessPickup">Park Street, Kolkata</span>
+        </div>
+        <div class="amb-success-item amb-item-full">
+          <span class="amb-success-lbl">Destination</span>
+          <span class="amb-success-val" id="ambSuccessDest">Apollo Multispeciality Hospitals</span>
+        </div>
+      </div>
+
+      <!-- Demo Architecture Notice -->
+      <div class="amb-success-note">
+        <strong>Frontend Demonstration Notice:</strong>
+        <p>This is a frontend demonstration. Real ambulance dispatch and GPS tracking will be connected to the backend later. For acute emergencies, call <strong>112</strong> immediately.</p>
+      </div>
+    </div>
+
+    <div class="amb-modal-footer" style="justify-content: center; gap: 12px;">
+      <button type="button" class="btn btn-outline" id="ambSuccessCloseBtn">
+        🔍 Find Another Ambulance
+      </button>
+      <a href="tel:112" class="btn btn-emergency-alt">
+        📞 Call 112 Hotline
+      </a>
     </div>
   </div>
 </div>
