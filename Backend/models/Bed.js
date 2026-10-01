@@ -53,6 +53,7 @@ const bedSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    optimisticConcurrency: true,
   }
 );
 
@@ -60,6 +61,11 @@ const bedSchema = new mongoose.Schema(
 bedSchema.virtual('hospitalId').get(function () {
   if (!this.hospital) return null;
   return this.hospital._id ? this.hospital._id.toString() : this.hospital.toString();
+});
+
+// Virtual for version referencing __v
+bedSchema.virtual('version').get(function () {
+  return this.__v;
 });
 
 // Compound unique index: A hospital can have only one record per bed category

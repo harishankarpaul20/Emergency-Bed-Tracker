@@ -48,6 +48,13 @@ const errorHandler = (err, req, res, next) => {
     errors = [{ field, message }];
   }
 
+  // Mongoose VersionError (Optimistic Concurrency Control)
+  if (err.name === 'VersionError') {
+    statusCode = 409;
+    message = 'Conflict: Stale record update detected. The document was modified by another operation. Please refresh and retry.';
+    errors = [{ field: 'version', message }];
+  }
+
   // JSON Syntax Error in request body
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     statusCode = 400;
@@ -63,6 +70,11 @@ const errorHandler = (err, req, res, next) => {
   if (err.name === 'TokenExpiredError') {
     statusCode = 401;
     message = 'Token expired. Please log in again.';
+  }
+
+  // Mask internal 500 server error details in production to prevent leaking sensitive system info
+  if (statusCode >= 500 && process.env.NODE_ENV === 'production') {
+    message = 'Internal server error occurred. Please try again later.';
   }
 
   res.status(statusCode).json({

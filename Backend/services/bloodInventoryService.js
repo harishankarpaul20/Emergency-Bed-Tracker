@@ -39,72 +39,93 @@ function getCompatibleBloodGroups(patientBloodGroup, component = 'Whole Blood') 
  * Ensures availableUnits >= quantity and never allows negative stock.
  */
 async function reserveBloodUnits({ hospitalId, bloodGroup, component, quantity, userId, userName, requestId, role = 'staff' }) {
-  if (!quantity || quantity <= 0) {
-    throw new Error('Quantity to reserve must be greater than 0');
+  const qty = Number(quantity);
+  if (!quantity || isNaN(qty) || !Number.isInteger(qty) || qty <= 0 || !isFinite(qty)) {
+    throw new Error('Quantity to reserve must be a positive integer');
   }
 
   const now = new Date();
-  const inventory = await BloodInventory.findOne({
-    hospital: hospitalId,
-    bloodGroup,
-    component,
-    expiryDate: { $gt: now },
-  });
 
-  if (!inventory) {
+  // ATOMIC CONDITIONAL UPDATE:
+  // Decrement availableUnits and increment reservedUnits ONLY if availableUnits >= quantity
+  // and inventory is active and not expired.
+  const updatedInventory = await BloodInventory.findOneAndUpdate(
+    {
+      hospital: hospitalId,
+      bloodGroup,
+      component,
+      expiryDate: { $gt: now },
+      availableUnits: { $gte: qty },
+    },
+    {
+      $inc: {
+        reservedUnits: qty,
+        availableUnits: -qty,
+      },
+      $set: {
+        lastUpdated: now,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!updatedInventory) {
+    // Distinguish between inactive/expired inventory and insufficient available stock
+    const existing = await BloodInventory.findOne({
+      hospital: hospitalId,
+      bloodGroup,
+      component,
+      expiryDate: { $gt: now },
+    }).lean();
+
+    if (!existing) {
+      return {
+        success: false,
+        availableUnits: 0,
+        message: 'No active ' + bloodGroup + ' ' + component + ' inventory found at this facility.',
+      };
+    }
+
     return {
       success: false,
-      availableUnits: 0,
-      message: 'No active ' + bloodGroup + ' ' + component + ' inventory found at this facility.',
+      availableUnits: existing.availableUnits,
+      message: 'Insufficient units available. Requested: ' + qty + ', Available: ' + existing.availableUnits,
     };
   }
 
-  if (inventory.availableUnits < quantity) {
-    return {
-      success: false,
-      availableUnits: inventory.availableUnits,
-      message: 'Insufficient units available. Requested: ' + quantity + ', Available: ' + inventory.availableUnits,
-    };
+  // Update status based on remaining available units
+  const newStatus = updatedInventory.availableUnits <= 1
+    ? 'Critical'
+    : (updatedInventory.availableUnits <= (updatedInventory.minThreshold || 5) ? 'Low Stock' : 'Available');
+
+  if (updatedInventory.status !== newStatus) {
+    await BloodInventory.updateOne({ _id: updatedInventory._id }, { $set: { status: newStatus } });
+    updatedInventory.status = newStatus;
   }
 
-  // Atomically update units
-  inventory.reservedUnits += quantity;
-  inventory.availableUnits = Math.max(0, inventory.totalUnits - inventory.reservedUnits - inventory.usedUnits - inventory.expiredUnits);
-  inventory.lastUpdated = now;
-
-  if (inventory.availableUnits <= 1) {
-    inventory.status = 'Critical';
-  } else if (inventory.availableUnits <= (inventory.minThreshold || 5)) {
-    inventory.status = 'Low Stock';
-  } else {
-    inventory.status = 'Available';
-  }
-
-  await inventory.save();
-
-  // Audit Log
+  // Audit Log - Only created on successful atomic reservation
   await AuditLog.create({
     user: userId,
     userName: userName || 'Authorized Staff',
     role,
     action: 'BLOOD_RESERVED',
     resourceType: 'BloodInventory',
-    resourceId: inventory._id,
+    resourceId: updatedInventory._id,
     hospital: hospitalId,
     details: {
       bloodGroup,
       component,
-      unitsReserved: quantity,
-      remainingAvailable: inventory.availableUnits,
+      unitsReserved: qty,
+      remainingAvailable: updatedInventory.availableUnits,
       requestId,
     },
   });
 
   return {
     success: true,
-    reservedUnits: quantity,
-    availableUnits: inventory.availableUnits,
-    inventory,
+    reservedUnits: qty,
+    availableUnits: updatedInventory.availableUnits,
+    inventory: updatedInventory,
   };
 }
 

@@ -177,4 +177,47 @@ referralSchema.index({ referringHospital: 1, status: 1 });
 referralSchema.index({ receivingHospital: 1, status: 1 });
 referralSchema.index({ receivingDoctor: 1, status: 1 });
 
+// SEC3-CONCUR-01F: Partial unique indexes to prevent duplicate referral creation
+// Only enforced for active (non-terminal) referrals
+const activeReferralFilter = {
+  status: { $in: ['pending', 'accepted', 'more_information_requested', 'more_info_requested', 'transferred', 'received'] },
+};
+
+// Unique active referral per bedRequest (when bedRequest is non-null)
+referralSchema.index(
+  { bedRequest: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      ...activeReferralFilter,
+      bedRequest: { $type: 'objectId' },
+    },
+    name: 'unique_active_bedRequest',
+  }
+);
+
+// Unique active referral per emergencyIntake (when emergencyIntake is non-null)
+referralSchema.index(
+  { emergencyIntake: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      ...activeReferralFilter,
+      emergencyIntake: { $type: 'objectId' },
+    },
+    name: 'unique_active_emergencyIntake',
+  }
+);
+
+// Unique active referral per patient + source + destination hospital pair
+referralSchema.index(
+  { patientName: 1, referringHospital: 1, receivingHospital: 1 },
+  {
+    unique: true,
+    partialFilterExpression: activeReferralFilter,
+    collation: { locale: 'en', strength: 2 },
+    name: 'unique_active_patient_hospital_pair',
+  }
+);
+
 module.exports = mongoose.model('Referral', referralSchema);

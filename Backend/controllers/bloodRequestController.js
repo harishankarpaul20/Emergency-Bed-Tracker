@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const BloodRequest = require('../models/BloodRequest');
 const Hospital = require('../models/Hospital');
 const User = require('../models/User');
@@ -7,6 +8,7 @@ const {
   releaseReservedBloodUnits,
   completeReservedBloodUnits,
 } = require('../services/bloodInventoryService');
+const { escapeRegex } = require('../utils/regexUtils');
 
 /**
  * Generate human-readable request ID format: BR-XXXXX
@@ -232,7 +234,7 @@ const getBloodRequests = async (req, res, next) => {
       filter.status = status;
     }
     if (urgency && urgency !== 'all') {
-      filter['bloodRequirement.urgency'] = new RegExp('^' + urgency.trim() + '$', 'i');
+      filter['bloodRequirement.urgency'] = new RegExp('^' + escapeRegex(urgency.trim()) + '$', 'i');
     }
     if (bloodGroup && bloodGroup !== 'all') {
       filter['bloodRequirement.bloodGroup'] = bloodGroup;
@@ -285,14 +287,76 @@ const getBloodRequests = async (req, res, next) => {
 };
 
 /**
+ * Helper to extract an ID string from an ObjectId, string, or populated document
+ */
+const toIdString = (val) => {
+  if (!val) return null;
+  if (typeof val === 'object' && val._id) return val._id.toString();
+  return val.toString();
+};
+
+/**
+ * Checks whether an authenticated user is authorized to view a specific blood request.
+ * Authorized if:
+ * 1. User is super_admin
+ * 2. User is the original requester (requester.user or requester.userId matches req.user._id)
+ * 3. User belongs to a hospital legitimately associated with the request
+ *    (recipients[].hospital, fulfillingHospital, sourceHospital, or patient.currentHospitalId)
+ */
+const isUserAuthorizedForBloodRequest = (user, bloodReq) => {
+  if (!user || !bloodReq) return false;
+
+  // 1. Super Admin has unrestricted system-wide access
+  if (user.role === 'super_admin') return true;
+
+  const currentUserId = user._id ? user._id.toString() : user.id?.toString();
+
+  // 2. Check if user is the original requester
+  const requesterUserId = toIdString(bloodReq.requester?.user) || toIdString(bloodReq.requester?.userId);
+  if (currentUserId && requesterUserId && requesterUserId === currentUserId) {
+    return true;
+  }
+
+  // 3. Hospital-affiliated roles: check association with the blood request
+  const isHospitalRole = ['hospital_admin', 'blood_bank_staff', 'doctor', 'staff'].includes(user.role);
+  if (!isHospitalRole) {
+    return false;
+  }
+
+  const userHospId = user.hospital?._id
+    ? user.hospital._id.toString()
+    : (user.hospital ? user.hospital.toString() : (user.hospitalId ? user.hospitalId.toString() : null));
+
+  if (!userHospId) {
+    return false;
+  }
+
+  // Associated hospital check: fulfillingHospital, sourceHospital, patient.currentHospitalId
+  if (toIdString(bloodReq.fulfillingHospital) === userHospId) return true;
+  if (toIdString(bloodReq.sourceHospital) === userHospId) return true;
+  if (toIdString(bloodReq.patient?.currentHospitalId) === userHospId) return true;
+
+  // Associated hospital check: target recipients array
+  if (Array.isArray(bloodReq.recipients)) {
+    const isTargetRecipient = bloodReq.recipients.some(
+      (r) => toIdString(r.hospital) === userHospId
+    );
+    if (isTargetRecipient) return true;
+  }
+
+  return false;
+};
+
+/**
  * @desc Get blood request details by ID or requestId (BR-XXXXX)
  * @route GET /api/blood-requests/:id
+ * @access Private
  */
 const getBloodRequestById = async (req, res, next) => {
   try {
-    const idParam = req.params.id;
-    const query = idParam.startsWith('BR-')
-      ? { requestId: idParam }
+    const idParam = (req.params.id || '').trim();
+    const query = idParam.toUpperCase().startsWith('BR-')
+      ? { requestId: idParam.toUpperCase() }
       : { _id: idParam };
 
     const reqDoc = await BloodRequest.findOne(query)
@@ -308,6 +372,15 @@ const getBloodRequestById = async (req, res, next) => {
 
     if (!reqDoc) {
       return res.status(404).json({ success: false, message: 'Blood request not found.' });
+    }
+
+    // SEC3-IDOR-01: Object-level authorization check
+    if (!isUserAuthorizedForBloodRequest(req.user, reqDoc)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not authorized to view this blood request.',
+        errors: [],
+      });
     }
 
     res.status(200).json({
@@ -339,7 +412,7 @@ const getMyBloodRequests = async (req, res, next) => {
       orConditions.push({ 'requester.contact': String(req.user.email).trim() });
     }
     if (req.user.name && String(req.user.name).trim()) {
-      orConditions.push({ 'requester.name': new RegExp('^' + String(req.user.name).trim() + '$', 'i') });
+      orConditions.push({ 'requester.name': new RegExp('^' + escapeRegex(String(req.user.name).trim()) + '$', 'i') });
     }
 
     const requests = await BloodRequest.find({ $or: orConditions })
@@ -372,26 +445,134 @@ const acceptBloodRequest = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Blood request not found.' });
     }
 
-    const userHosp = req.user.hospital?._id ? req.user.hospital._id.toString() : (req.user.hospital?.toString() || req.user.hospitalId);
+    // 1. Hospital Ownership & Authorization (Step 5 & 16)
+    const userHosp = req.user.hospital?._id
+      ? req.user.hospital._id.toString()
+      : (req.user.hospital?.toString() || req.user.hospitalId?.toString());
+
     if (!userHosp && req.user.role !== 'super_admin') {
       return res.status(403).json({ success: false, message: 'Unauthorized: User does not belong to a hospital.' });
     }
 
     const targetHospId = userHosp || bloodReq.recipients[0]?.hospital?.toString();
-
-    // Check recipient entry
-    let recipient = bloodReq.recipients.find(r => r.hospital.toString() === targetHospId);
-    if (!recipient) {
-      recipient = { hospital: targetHospId, status: 'PENDING', reservedUnits: 0 };
-      bloodReq.recipients.push(recipient);
+    if (!targetHospId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized: No hospital context found.' });
     }
 
-    // Atomic inventory reservation
+    const targetHospObjId = new mongoose.Types.ObjectId(targetHospId);
+
+    // Verify authorized recipient
+    const isRecipient = bloodReq.recipients && bloodReq.recipients.some(
+      r => r.hospital && r.hospital.toString() === targetHospId
+    );
+    if (!isRecipient && req.user.role !== 'super_admin' && bloodReq.sourceHospital?.toString() !== targetHospId && bloodReq.fulfillingHospital?.toString() !== targetHospId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized: Hospital is not an authorized recipient for this blood request.',
+      });
+    }
+
+    // 2. Invalid Request State Checks (Step 17)
+    if (['BLOOD_RESERVED', 'ACCEPTED', 'READY_FOR_COLLECTION', 'COMPLETED'].includes(bloodReq.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Conflict: Blood request has already been claimed or accepted (current status: ${bloodReq.status}).`,
+      });
+    }
+
+    if (['CANCELLED', 'EXPIRED', 'REJECTED'].includes(bloodReq.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Conflict: Cannot accept blood request in '${bloodReq.status}' status.`,
+      });
+    }
+
+    if (bloodReq.status === 'PARTIALLY_ACCEPTED') {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Blood request has already been partially accepted. Please use the partial-accept endpoint.',
+      });
+    }
+
+    const requestedQty = bloodReq.bloodRequirement?.quantity || 1;
+
+    // 3. Atomic Single-Claim Database Operation (Step 4 & 6)
+    // Only transitions if status is PENDING/SENT/VIEWED and no units have been claimed yet
+    let claimedReq;
+    if (isRecipient) {
+      claimedReq = await BloodRequest.findOneAndUpdate(
+        {
+          _id: bloodReq._id,
+          status: { $in: ['PENDING', 'SENT', 'VIEWED'] },
+          $or: [
+            { totalReservedUnits: { $exists: false } },
+            { totalReservedUnits: 0 },
+          ],
+        },
+        {
+          $set: {
+            status: 'BLOOD_RESERVED',
+            fulfillingHospital: targetHospObjId,
+            totalReservedUnits: requestedQty,
+            'recipients.$[elem].status': 'ACCEPTED',
+            'recipients.$[elem].respondedBy': req.user._id,
+            'recipients.$[elem].respondedAt': new Date(),
+            'recipients.$[elem].reservedUnits': requestedQty,
+          },
+        },
+        {
+          arrayFilters: [{ 'elem.hospital': targetHospObjId }],
+          returnDocument: 'after',
+        }
+      );
+    } else {
+      // Super admin or newly associated facility
+      claimedReq = await BloodRequest.findOneAndUpdate(
+        {
+          _id: bloodReq._id,
+          status: { $in: ['PENDING', 'SENT', 'VIEWED'] },
+          $or: [
+            { totalReservedUnits: { $exists: false } },
+            { totalReservedUnits: 0 },
+          ],
+        },
+        {
+          $set: {
+            status: 'BLOOD_RESERVED',
+            fulfillingHospital: targetHospObjId,
+            totalReservedUnits: requestedQty,
+          },
+          $push: {
+            recipients: {
+              hospital: targetHospObjId,
+              status: 'ACCEPTED',
+              respondedBy: req.user._id,
+              respondedAt: new Date(),
+              reservedUnits: requestedQty,
+            },
+          },
+        },
+        {
+          returnDocument: 'after',
+        }
+      );
+    }
+
+    // 4. Losing Hospital Handling (Step 7)
+    if (!claimedReq) {
+      const refreshed = await BloodRequest.findById(req.params.id);
+      return res.status(409).json({
+        success: false,
+        message: `Conflict: Blood request has already been claimed or accepted by another hospital (current status: ${refreshed?.status || 'UNAVAILABLE'}).`,
+      });
+    }
+
+    // 5. Atomic Inventory Reservation (Step 8 - SEC3-CONCUR-01B protected)
     const reserveResult = await reserveBloodUnits({
       hospitalId: targetHospId,
       bloodGroup: bloodReq.bloodRequirement.bloodGroup,
       component: bloodReq.bloodRequirement.component,
-      quantity: bloodReq.bloodRequirement.quantity,
+      quantity: requestedQty,
       userId: req.user._id,
       userName: req.user.name,
       requestId: bloodReq._id,
@@ -399,6 +580,39 @@ const acceptBloodRequest = async (req, res, next) => {
     });
 
     if (!reserveResult.success) {
+      // Rollback the claim on inventory reservation failure (Step 18)
+      if (isRecipient) {
+        await BloodRequest.updateOne(
+          { _id: bloodReq._id, fulfillingHospital: targetHospObjId, status: 'BLOOD_RESERVED' },
+          {
+            $set: {
+              status: 'PENDING',
+              totalReservedUnits: 0,
+              'recipients.$[elem].status': 'PENDING',
+              'recipients.$[elem].reservedUnits': 0,
+              'recipients.$[elem].respondedBy': null,
+              'recipients.$[elem].respondedAt': null,
+            },
+          },
+          {
+            arrayFilters: [{ 'elem.hospital': targetHospObjId }],
+          }
+        );
+      } else {
+        await BloodRequest.updateOne(
+          { _id: bloodReq._id, fulfillingHospital: targetHospObjId, status: 'BLOOD_RESERVED' },
+          {
+            $set: {
+              status: 'PENDING',
+              totalReservedUnits: 0,
+            },
+            $pull: {
+              recipients: { hospital: targetHospObjId },
+            },
+          }
+        );
+      }
+
       return res.status(400).json({
         success: false,
         message: reserveResult.message,
@@ -406,35 +620,25 @@ const acceptBloodRequest = async (req, res, next) => {
       });
     }
 
-    // Update recipient
-    recipient.status = 'ACCEPTED';
-    recipient.respondedBy = req.user._id;
-    recipient.respondedAt = new Date();
-    recipient.reservedUnits = bloodReq.bloodRequirement.quantity;
-
-    // Update master status
-    bloodReq.status = 'BLOOD_RESERVED';
-    bloodReq.fulfillingHospital = targetHospId;
-    await bloodReq.save();
-
+    // 6. Success Side Effects ONLY on successful atomic claim & reservation (Step 13)
     await AuditLog.create({
       user: req.user._id,
       userName: req.user.name,
       role: req.user.role,
       action: 'BLOOD_REQUEST_ACCEPTED',
       resourceType: 'BloodRequest',
-      resourceId: bloodReq._id,
+      resourceId: claimedReq._id,
       hospital: targetHospId,
       details: {
-        requestId: bloodReq.requestId,
-        reservedUnits: bloodReq.bloodRequirement.quantity,
+        requestId: claimedReq.requestId,
+        reservedUnits: requestedQty,
       },
     });
 
     if (req.io) {
       req.io.emit('bloodRequestUpdated', {
-        id: bloodReq._id,
-        requestId: bloodReq.requestId,
+        id: claimedReq._id,
+        requestId: claimedReq.requestId,
         status: 'BLOOD_RESERVED',
         fulfillingHospitalId: targetHospId,
       });
@@ -442,8 +646,8 @@ const acceptBloodRequest = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: `Blood request ${bloodReq.requestId} accepted and ${bloodReq.bloodRequirement.quantity} units reserved successfully.`,
-      data: bloodReq,
+      message: `Blood request ${claimedReq.requestId} accepted and ${requestedQty} units reserved successfully.`,
+      data: claimedReq,
     });
   } catch (err) {
     next(err);
@@ -469,16 +673,151 @@ const partiallyAcceptBloodRequest = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Blood request not found.' });
     }
 
-    const userHosp = req.user.hospital?._id ? req.user.hospital._id.toString() : (req.user.hospital?.toString() || req.user.hospitalId);
-    const targetHospId = userHosp || bloodReq.recipients[0]?.hospital?.toString();
+    // 1. Hospital Ownership & Authorization (Step 5 & 16)
+    const userHosp = req.user.hospital?._id
+      ? req.user.hospital._id.toString()
+      : (req.user.hospital?.toString() || req.user.hospitalId?.toString());
 
-    let recipient = bloodReq.recipients.find(r => r.hospital.toString() === targetHospId);
-    if (!recipient) {
-      recipient = { hospital: targetHospId, status: 'PENDING', reservedUnits: 0 };
-      bloodReq.recipients.push(recipient);
+    if (!userHosp && req.user.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Unauthorized: User does not belong to a hospital.' });
     }
 
-    // Reserve partial quantity
+    const targetHospId = userHosp || bloodReq.recipients[0]?.hospital?.toString();
+    if (!targetHospId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized: No hospital context found.' });
+    }
+
+    const targetHospObjId = new mongoose.Types.ObjectId(targetHospId);
+
+    const isRecipient = bloodReq.recipients && bloodReq.recipients.some(
+      r => r.hospital && r.hospital.toString() === targetHospId
+    );
+    if (!isRecipient && req.user.role !== 'super_admin' && bloodReq.sourceHospital?.toString() !== targetHospId && bloodReq.fulfillingHospital?.toString() !== targetHospId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized: Hospital is not an authorized recipient for this blood request.',
+      });
+    }
+
+    // 2. Invalid Request State Checks (Step 17)
+    if (['BLOOD_RESERVED', 'ACCEPTED', 'READY_FOR_COLLECTION', 'COMPLETED'].includes(bloodReq.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Conflict: Blood request has already been fully claimed or completed (status: ${bloodReq.status}).`,
+      });
+    }
+
+    if (['CANCELLED', 'EXPIRED', 'REJECTED'].includes(bloodReq.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Conflict: Cannot partially accept blood request in '${bloodReq.status}' status.`,
+      });
+    }
+
+    const totalNeeded = bloodReq.bloodRequirement?.quantity || 1;
+    const currentReserved = bloodReq.totalReservedUnits || 0;
+    const remainingNeeded = totalNeeded - currentReserved;
+
+    if (remainingNeeded <= 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Blood request requirement has already been completely fulfilled.',
+      });
+    }
+
+    if (partialQty > remainingNeeded) {
+      return res.status(400).json({
+        success: false,
+        message: `Requested partial units (${partialQty}) exceeds remaining required units (${remainingNeeded}).`,
+      });
+    }
+
+    // 3. Atomic Quantity Claim (Step 10 & 11)
+    // Enforce invariant: totalReservedUnits + partialQty <= bloodRequirement.quantity
+    let claimedReq;
+    if (isRecipient) {
+      claimedReq = await BloodRequest.findOneAndUpdate(
+        {
+          _id: bloodReq._id,
+          status: { $in: ['PENDING', 'SENT', 'VIEWED', 'PARTIALLY_ACCEPTED'] },
+          $expr: {
+            $lte: [
+              { $add: [{ $ifNull: ['$totalReservedUnits', 0] }, partialQty] },
+              '$bloodRequirement.quantity',
+            ],
+          },
+        },
+        {
+          $inc: { totalReservedUnits: partialQty },
+          $set: {
+            status: (currentReserved + partialQty >= totalNeeded) ? 'BLOOD_RESERVED' : 'PARTIALLY_ACCEPTED',
+            fulfillingHospital: targetHospObjId,
+            'recipients.$[elem].status': 'PARTIALLY_ACCEPTED',
+            'recipients.$[elem].respondedBy': req.user._id,
+            'recipients.$[elem].respondedAt': new Date(),
+            'recipients.$[elem].reservedUnits': partialQty,
+            'recipients.$[elem].partialUnitsAvailable': partialQty,
+            'recipients.$[elem].notes': notes || (`Partial stock available: ${partialQty} of ${totalNeeded} units`),
+          },
+        },
+        {
+          arrayFilters: [{ 'elem.hospital': targetHospObjId }],
+          returnDocument: 'after',
+        }
+      );
+    } else {
+      claimedReq = await BloodRequest.findOneAndUpdate(
+        {
+          _id: bloodReq._id,
+          status: { $in: ['PENDING', 'SENT', 'VIEWED', 'PARTIALLY_ACCEPTED'] },
+          $expr: {
+            $lte: [
+              { $add: [{ $ifNull: ['$totalReservedUnits', 0] }, partialQty] },
+              '$bloodRequirement.quantity',
+            ],
+          },
+        },
+        {
+          $inc: { totalReservedUnits: partialQty },
+          $set: {
+            status: (currentReserved + partialQty >= totalNeeded) ? 'BLOOD_RESERVED' : 'PARTIALLY_ACCEPTED',
+            fulfillingHospital: targetHospObjId,
+          },
+          $push: {
+            recipients: {
+              hospital: targetHospObjId,
+              status: 'PARTIALLY_ACCEPTED',
+              respondedBy: req.user._id,
+              respondedAt: new Date(),
+              reservedUnits: partialQty,
+              partialUnitsAvailable: partialQty,
+              notes: notes || (`Partial stock available: ${partialQty} of ${totalNeeded} units`),
+            },
+          },
+        },
+        {
+          returnDocument: 'after',
+        }
+      );
+    }
+
+    if (!claimedReq) {
+      const refreshed = await BloodRequest.findById(req.params.id);
+      const remaining = refreshed ? (refreshed.bloodRequirement.quantity - (refreshed.totalReservedUnits || 0)) : 0;
+      return res.status(409).json({
+        success: false,
+        message: `Conflict: Could not claim ${partialQty} units. Only ${remaining} remaining or request already claimed.`,
+      });
+    }
+
+    // Check if totalReservedUnits has now reached or exceeded the full requested quantity
+    const totalRequired = claimedReq.bloodRequirement?.quantity || 1;
+    if (claimedReq.totalReservedUnits >= totalRequired && claimedReq.status !== 'BLOOD_RESERVED') {
+      claimedReq.status = 'BLOOD_RESERVED';
+      await BloodRequest.updateOne({ _id: claimedReq._id }, { $set: { status: 'BLOOD_RESERVED' } });
+    }
+
+    // 4. Atomic Inventory Reservation (Step 8 - SEC3-CONCUR-01B protected)
     const reserveResult = await reserveBloodUnits({
       hospitalId: targetHospId,
       bloodGroup: bloodReq.bloodRequirement.bloodGroup,
@@ -491,6 +830,24 @@ const partiallyAcceptBloodRequest = async (req, res, next) => {
     });
 
     if (!reserveResult.success) {
+      // Rollback the partial reservation claim
+      const revertedUnits = Math.max(0, (claimedReq.totalReservedUnits || 0) - partialQty);
+      await BloodRequest.updateOne(
+        { _id: bloodReq._id },
+        {
+          $set: {
+            totalReservedUnits: revertedUnits,
+            status: revertedUnits > 0 ? 'PARTIALLY_ACCEPTED' : 'PENDING',
+            'recipients.$[elem].status': 'PENDING',
+            'recipients.$[elem].reservedUnits': 0,
+            'recipients.$[elem].partialUnitsAvailable': 0,
+          },
+        },
+        {
+          arrayFilters: [{ 'elem.hospital': targetHospObjId }],
+        }
+      );
+
       return res.status(400).json({
         success: false,
         message: reserveResult.message,
@@ -498,35 +855,26 @@ const partiallyAcceptBloodRequest = async (req, res, next) => {
       });
     }
 
-    recipient.status = 'PARTIALLY_ACCEPTED';
-    recipient.respondedBy = req.user._id;
-    recipient.respondedAt = new Date();
-    recipient.reservedUnits = partialQty;
-    recipient.partialUnitsAvailable = partialQty;
-    recipient.notes = notes || (`Partial stock available: ${partialQty} of ${bloodReq.bloodRequirement.quantity} units`);
-
-    bloodReq.status = 'PARTIALLY_ACCEPTED';
-    bloodReq.fulfillingHospital = targetHospId;
-    await bloodReq.save();
-
+    // 5. Success Side Effects ONLY on successful atomic claim & reservation (Step 13)
     await AuditLog.create({
       user: req.user._id,
       userName: req.user.name,
       role: req.user.role,
       action: 'BLOOD_PARTIALLY_ACCEPTED',
       resourceType: 'BloodRequest',
-      resourceId: bloodReq._id,
+      resourceId: claimedReq._id,
       hospital: targetHospId,
       details: {
-        requestId: bloodReq.requestId,
+        requestId: claimedReq.requestId,
         partialUnits: partialQty,
+        totalReserved: claimedReq.totalReservedUnits,
       },
     });
 
     res.status(200).json({
       success: true,
       message: `Partially accepted with ${partialQty} units reserved.`,
-      data: bloodReq,
+      data: claimedReq,
     });
   } catch (err) {
     next(err);
@@ -553,7 +901,7 @@ const rejectBloodRequest = async (req, res, next) => {
     const userHosp = req.user.hospital?._id ? req.user.hospital._id.toString() : (req.user.hospital?.toString() || req.user.hospitalId);
     const targetHospId = userHosp || bloodReq.recipients[0]?.hospital?.toString();
 
-    let recipient = bloodReq.recipients.find(r => r.hospital.toString() === targetHospId);
+    let recipient = bloodReq.recipients.find(r => r.hospital && r.hospital.toString() === targetHospId);
     if (!recipient) {
       recipient = { hospital: targetHospId, status: 'PENDING', reservedUnits: 0 };
       bloodReq.recipients.push(recipient);
@@ -561,17 +909,19 @@ const rejectBloodRequest = async (req, res, next) => {
 
     // Release if held
     if (recipient.reservedUnits > 0) {
+      const unitsToRelease = recipient.reservedUnits;
       await releaseReservedBloodUnits({
         hospitalId: targetHospId,
         bloodGroup: bloodReq.bloodRequirement.bloodGroup,
         component: bloodReq.bloodRequirement.component,
-        quantity: recipient.reservedUnits,
+        quantity: unitsToRelease,
         userId: req.user._id,
         userName: req.user.name,
         requestId: bloodReq._id,
         reason: 'Request rejected: ' + reason.trim(),
       });
       recipient.reservedUnits = 0;
+      bloodReq.totalReservedUnits = Math.max(0, (bloodReq.totalReservedUnits || 0) - unitsToRelease);
     }
 
     recipient.status = 'REJECTED';
@@ -583,6 +933,8 @@ const rejectBloodRequest = async (req, res, next) => {
     const allRejected = bloodReq.recipients.every(r => r.status === 'REJECTED');
     if (allRejected) {
       bloodReq.status = 'REJECTED';
+    } else if ((bloodReq.totalReservedUnits || 0) === 0) {
+      bloodReq.status = 'PENDING';
     }
 
     await bloodReq.save();
@@ -642,6 +994,7 @@ const cancelBloodRequest = async (req, res, next) => {
     }
 
     bloodReq.status = 'CANCELLED';
+    bloodReq.totalReservedUnits = 0;
     bloodReq.cancelledAt = new Date();
     await bloodReq.save();
 
@@ -730,4 +1083,5 @@ module.exports = {
   rejectBloodRequest,
   cancelBloodRequest,
   completeBloodRequest,
+  isUserAuthorizedForBloodRequest,
 };

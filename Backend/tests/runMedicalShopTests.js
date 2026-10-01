@@ -47,10 +47,15 @@ async function runMedicalShopTests() {
     const adminUser = await User.findOne({ role: 'super_admin' });
     const regularUser = await User.findOne({ role: 'user' });
 
-    const adminToken = adminUser ? jwt.sign({ id: adminUser._id, role: adminUser.role }, process.env.JWT_SECRET || 'dev_jwt_secret_medical_bed_tracker_west_bengal_2026_xyz', { expiresIn: '1h' }) : '';
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET must be defined in environment for running test suite');
+    }
+
+    const adminToken = adminUser ? jwt.sign({ id: adminUser._id, role: adminUser.role }, jwtSecret, { expiresIn: '1h' }) : '';
     const citizenToken = regularUser
-      ? jwt.sign({ id: regularUser._id, role: regularUser.role }, process.env.JWT_SECRET || 'dev_jwt_secret_medical_bed_tracker_west_bengal_2026_xyz', { expiresIn: '1h' })
-      : jwt.sign({ id: new mongoose.Types.ObjectId(), role: 'user' }, process.env.JWT_SECRET || 'dev_jwt_secret_medical_bed_tracker_west_bengal_2026_xyz', { expiresIn: '1h' });
+      ? jwt.sign({ id: regularUser._id, role: regularUser.role }, jwtSecret, { expiresIn: '1h' })
+      : jwt.sign({ id: new mongoose.Types.ObjectId(), role: 'user' }, jwtSecret, { expiresIn: '1h' });
 
     // TEST 1: Public listing of active 24x7 medical shops
     const resList = await requestJson(`${BASE_URL}/medical-shops`);

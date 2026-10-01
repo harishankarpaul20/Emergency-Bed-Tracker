@@ -1,4 +1,4 @@
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 
 const emergencyIntakeRules = [
   body('patientName')
@@ -96,6 +96,13 @@ const emergencyIntakeRules = [
     .trim(),
 ];
 
+const intakeIdParamRule = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid emergency intake ID format'),
+];
+
 module.exports = {
   emergencyIntakeRules,
+  intakeIdParamRule,
 };

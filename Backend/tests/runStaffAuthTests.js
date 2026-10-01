@@ -190,6 +190,9 @@ async function runStaffAuthTests() {
     // ----------------------------------------------------
     // PREPARATION: Create Bed Requests for Hospital A and Hospital B
     // ----------------------------------------------------
+    await Bed.updateOne({ _id: hospitalABed._id }, { $inc: { reservedBeds: 2 } });
+    await Bed.updateOne({ _id: hospitalBBed._id }, { $inc: { reservedBeds: 1 } });
+
     requestForHospitalA = await BedRequest.create({
       user: resA_Login.body.data.user.id,
       hospital: hospitalA._id,
@@ -284,7 +287,8 @@ async function runStaffAuthTests() {
     // ----------------------------------------------------
     // TEST 10: Hospital A Admin updates Hospital B bed availability (403 + MongoDB unchanged)
     // ----------------------------------------------------
-    const beforeOccB = hospitalBBed.occupiedBeds;
+    const freshBedB = await Bed.findById(hospitalBBed._id);
+    const beforeOccB = freshBedB.occupiedBeds;
     const resBedUpdateCross = await requestJson(`${BASE_URL}/beds/${hospitalBBed._id}/availability`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${apolloAdminToken}` },

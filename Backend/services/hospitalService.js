@@ -1,6 +1,7 @@
 const Hospital = require('../models/Hospital');
 const Bed = require('../models/Bed');
 const { formatBedSummary } = require('./bedService');
+const { escapeRegex } = require('../utils/regexUtils');
 
 /**
  * Haversine formula for calculating distance in km between two geo-coordinates
@@ -39,17 +40,17 @@ async function searchHospitals(queryParams = {}) {
 
   // Filter by District
   if (district && district !== 'all') {
-    filter.district = new RegExp(`^${district.trim()}$`, 'i');
+    filter.district = new RegExp(`^${escapeRegex(district.trim())}$`, 'i');
   }
 
   // Filter by City / Area
   if (city && city !== 'all') {
-    filter.area = new RegExp(`^${city.trim()}$`, 'i');
+    filter.area = new RegExp(`^${escapeRegex(city.trim())}$`, 'i');
   }
 
   // Text search query
   if (search && search.trim()) {
-    const s = search.trim();
+    const s = escapeRegex(search.trim());
     filter.$or = [
       { name: { $regex: s, $options: 'i' } },
       { district: { $regex: s, $options: 'i' } },

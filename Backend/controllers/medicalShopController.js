@@ -1,5 +1,6 @@
 const MedicalShop = require('../models/MedicalShop');
 const logger = require('../utils/logger');
+const { escapeRegex } = require('../utils/regexUtils');
 
 /**
  * Haversine formula to calculate distance in km between two geo-coordinates
@@ -52,22 +53,22 @@ const getMedicalShops = async (req, res, next) => {
 
     // District filter
     if (district && district !== 'all') {
-      filter.district = new RegExp(`^${district.trim()}$`, 'i');
+      filter.district = new RegExp(`^${escapeRegex(district.trim())}$`, 'i');
     }
 
     // Area filter
     if (area && area !== 'all') {
-      filter.area = new RegExp(area.trim(), 'i');
+      filter.area = new RegExp(escapeRegex(area.trim()), 'i');
     }
 
     // City filter
     if (city && city !== 'all') {
-      filter.city = new RegExp(city.trim(), 'i');
+      filter.city = new RegExp(escapeRegex(city.trim()), 'i');
     }
 
     // General text search (name, area, city, district, address)
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       filter.$or = [
         { name: searchRegex },
         { area: searchRegex },
@@ -198,11 +199,11 @@ const createMedicalShop = async (req, res, next) => {
 
     // Duplicate detection: check if a shop with same name and phone or same name and address exists in same district
     const existingShop = await MedicalShop.findOne({
-      district: new RegExp(`^${district.trim()}$`, 'i'),
-      name: new RegExp(`^${name.trim()}$`, 'i'),
+      district: new RegExp(`^${escapeRegex(district.trim())}$`, 'i'),
+      name: new RegExp(`^${escapeRegex(name.trim())}$`, 'i'),
       $or: [
         { phone: phone.trim() },
-        { address: new RegExp(`^${address.trim()}$`, 'i') },
+        { address: new RegExp(`^${escapeRegex(address.trim())}$`, 'i') },
       ],
     });
 
@@ -213,6 +214,10 @@ const createMedicalShop = async (req, res, next) => {
         errors: [{ field: 'name', message: 'Duplicate pharmacy record' }],
       });
     }
+
+    const userHosp = req.user?.hospital?._id
+      ? req.user.hospital._id.toString()
+      : (req.user?.hospital ? req.user.hospital.toString() : (req.user?.hospitalId ? req.user.hospitalId.toString() : null));
 
     const shop = await MedicalShop.create({
       name: name.trim(),
@@ -234,6 +239,8 @@ const createMedicalShop = async (req, res, next) => {
       description: (description || '').trim(),
       services: Array.isArray(services) && services.length ? services : ['Allopathic Medicines', 'Emergency First Aid'],
       isActive: true,
+      hospital: userHosp || undefined,
+      createdBy: req.user?._id || undefined,
     });
 
     logger.info(`💊 Medical Shop created [ID: ${shop._id}] - ${shop.name} (${shop.district})`);
@@ -252,6 +259,50 @@ const createMedicalShop = async (req, res, next) => {
 };
 
 /**
+ * Helper to extract an ID string from an ObjectId, string, or populated document
+ */
+const toIdString = (val) => {
+  if (!val) return null;
+  if (typeof val === 'object' && val._id) return val._id.toString();
+  return val.toString();
+};
+
+/**
+ * Checks whether an authenticated user is authorized to modify or delete a medical shop.
+ * Authorized if:
+ * 1. User is super_admin (global administrative access)
+ * 2. User belongs to the hospital associated with the medical shop (shop.hospital matches user.hospital)
+ * 3. User is the creator of the shop (shop.createdBy matches user._id)
+ */
+const isUserAuthorizedForMedicalShop = (user, shop) => {
+  if (!user || !shop) return false;
+
+  // 1. Super Admin has unrestricted global access
+  if (user.role === 'super_admin') return true;
+
+  const currentUserId = user._id ? user._id.toString() : user.id?.toString();
+  const userHospId = user.hospital?._id
+    ? user.hospital._id.toString()
+    : (user.hospital ? user.hospital.toString() : (user.hospitalId ? user.hospitalId.toString() : null));
+
+  const shopHospitalId = toIdString(shop.hospital);
+  const shopCreatorId = toIdString(shop.createdBy);
+
+  // If shop is assigned to a hospital, user's hospital must match
+  if (shopHospitalId) {
+    return Boolean(userHospId && userHospId === shopHospitalId);
+  }
+
+  // If shop is not linked to a hospital but has a creator, creator matches
+  if (shopCreatorId && currentUserId) {
+    return shopCreatorId === currentUserId;
+  }
+
+  // Unassigned global/system medical shops can only be modified by super_admin
+  return false;
+};
+
+/**
  * @desc    Update medical shop details (Staff / Admin)
  * @route   PUT /api/medical-shops/:id
  * @access  Private (Staff / Admin)
@@ -264,6 +315,15 @@ const updateMedicalShop = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'Medical shop not found',
+        errors: [],
+      });
+    }
+
+    // SEC3-IDOR-02: Tenant/object-level authorization check
+    if (!isUserAuthorizedForMedicalShop(req.user, shop)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not authorized to update this medical shop.',
         errors: [],
       });
     }
@@ -327,6 +387,15 @@ const deleteMedicalShop = async (req, res, next) => {
       });
     }
 
+    // SEC3-IDOR-02: Tenant/object-level authorization check
+    if (!isUserAuthorizedForMedicalShop(req.user, shop)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not authorized to delete this medical shop.',
+        errors: [],
+      });
+    }
+
     await MedicalShop.findByIdAndDelete(req.params.id);
 
     res.status(200).json({
@@ -345,4 +414,5 @@ module.exports = {
   createMedicalShop,
   updateMedicalShop,
   deleteMedicalShop,
+  isUserAuthorizedForMedicalShop,
 };

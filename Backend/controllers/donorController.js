@@ -1,5 +1,6 @@
 const Donor = require('../models/Donor');
 const AuditLog = require('../models/AuditLog');
+const { escapeRegex } = require('../utils/regexUtils');
 
 /**
  * @desc Register voluntary blood donor
@@ -62,8 +63,8 @@ const searchDonors = async (req, res, next) => {
     const filter = {};
 
     if (bloodGroup && bloodGroup !== 'all') filter.bloodGroup = bloodGroup;
-    if (district && district !== 'all') filter.district = new RegExp('^' + district.trim() + '$', 'i');
-    if (city && city !== 'all') filter.city = new RegExp(city.trim(), 'i');
+    if (district && district !== 'all') filter.district = new RegExp('^' + escapeRegex(district.trim()) + '$', 'i');
+    if (city && city !== 'all') filter.city = new RegExp(escapeRegex(city.trim()), 'i');
     if (availableOnly !== 'false') filter.isAvailable = true;
 
     // Check if user is authorized to view phone numbers

@@ -30,9 +30,17 @@ const chatRoutes = require('./routes/chatRoutes');
 const app = express();
 const server = http.createServer(app);
 
-// Explicitly allowed origins (GitHub Pages, local dev environments, and custom domains)
-const allowedOrigins = [
+// Trust reverse proxy for accurate client IP identification behind Render / edge load balancers
+// Hop count 1 trusts the immediate reverse proxy (Render edge) while preventing client IP header spoofing
+app.set('trust proxy', 1);
+
+// Base production allowed origins (SEC4-CORS-01: strictly explicit allowlist)
+const PRODUCTION_ORIGINS = [
   'https://harishankarpaul20.github.io',
+];
+
+// Local development origins (only permitted in non-production environments)
+const DEV_ORIGINS = [
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'http://localhost:3000',
@@ -42,29 +50,75 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://localhost:8080',
   'http://127.0.0.1:8080',
-  null, // allows opening index.html directly via file://
 ];
 
-if (process.env.CLIENT_URL) {
-  allowedOrigins.push(process.env.CLIENT_URL);
-}
-if (process.env.ALLOWED_ORIGINS) {
-  process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).forEach((o) => {
-    if (o && !allowedOrigins.includes(o)) allowedOrigins.push(o);
-  });
+/**
+ * Resolves current allowed origins based on environment and explicit config
+ */
+function getAllowedOrigins() {
+  const origins = [...PRODUCTION_ORIGINS];
+
+  if (process.env.NODE_ENV !== 'production') {
+    DEV_ORIGINS.forEach((devOrigin) => {
+      if (!origins.includes(devOrigin)) {
+        origins.push(devOrigin);
+      }
+    });
+  }
+
+  if (process.env.CLIENT_URL) {
+    const clientUrl = process.env.CLIENT_URL.trim();
+    if (clientUrl && !origins.includes(clientUrl)) {
+      if (process.env.NODE_ENV === 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(clientUrl)) {
+        // Disallow localhost origins in production even if set in local .env
+      } else {
+        origins.push(clientUrl);
+      }
+    }
+  }
+
+  if (process.env.ALLOWED_ORIGINS) {
+    process.env.ALLOWED_ORIGINS.split(',')
+      .map((o) => o.trim())
+      .forEach((o) => {
+        if (o && !origins.includes(o)) {
+          if (process.env.NODE_ENV === 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)) {
+            // Disallow localhost origins in production
+          } else {
+            origins.push(o);
+          }
+        }
+      });
+  }
+
+  return origins;
 }
 
 /**
- * Validates request origin against allowed origins, GitHub Pages pattern, or localhost
+ * Validates request origin against explicit allowlist (SEC4-CORS-01)
+ * - Rejects null origins
+ * - Rejects arbitrary *.github.io origins
+ * - Allows explicit production frontend origin
+ * - Allows localhost only in non-production environments
  */
 function isOriginAllowed(origin) {
-  if (!origin || origin === 'null') return true;
-  if (allowedOrigins.includes(origin)) return true;
-  // Match any GitHub Pages origin (e.g. https://<user>.github.io)
-  if (/^https:\/\/[a-zA-Z0-9-]+\.github\.io$/.test(origin)) return true;
-  // Match any localhost or 127.0.0.1 port
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
-  return true; // Permissive fallback to guarantee connectivity
+  if (!origin || origin === 'null') {
+    return false;
+  }
+
+  const currentAllowed = getAllowedOrigins();
+  if (currentAllowed.includes(origin)) {
+    return true;
+  }
+
+  // Local development fallback for dynamic ports (strictly non-production)
+  if (process.env.NODE_ENV !== 'production') {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 const io = new Server(server, {
@@ -95,7 +149,12 @@ app.use((req, res, next) => {
 // Security HTTP headers via Helmet
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Don't break Leaflet maps / CDN scripts
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
   })
 );
@@ -107,7 +166,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'X-CSRF-Token', 'X-XSRF-Token'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 204,
 };
@@ -117,6 +176,30 @@ app.use(cors(corsOptions));
 // Body Parsers
 app.use(express.json({ limit: '50kb' }));
 app.use(express.urlencoded({ extended: true, limit: '50kb' }));
+
+// Native cookie parser middleware (zero external dependencies)
+function parseCookies(req) {
+  const list = {};
+  const cookieHeader = req.headers && req.headers.cookie;
+  if (!cookieHeader) return list;
+  cookieHeader.split(';').forEach((cookie) => {
+    let [name, ...rest] = cookie.split('=');
+    name = name?.trim();
+    if (!name) return;
+    const value = rest.join('=').trim();
+    try {
+      list[name] = decodeURIComponent(value);
+    } catch (e) {
+      list[name] = value;
+    }
+  });
+  return list;
+}
+
+app.use((req, res, next) => {
+  req.cookies = parseCookies(req);
+  next();
+});
 
 // HTTP Request Logging
 if (process.env.NODE_ENV !== 'test') {
@@ -210,4 +293,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { app, server, io, startServer };
+module.exports = { app, server, io, startServer, isOriginAllowed, getAllowedOrigins };

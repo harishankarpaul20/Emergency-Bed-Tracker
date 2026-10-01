@@ -242,6 +242,11 @@ const bloodRequestSchema = new mongoose.Schema(
 
     completedAt: Date,
     cancelledAt: Date,
+    totalReservedUnits: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,
@@ -294,6 +299,7 @@ bloodRequestSchema.index({ 'recipients.hospital': 1, status: 1 });
 bloodRequestSchema.index({ 'requester.user': 1, createdAt: -1 });
 bloodRequestSchema.index({ 'requester.userId': 1, createdAt: -1 });
 bloodRequestSchema.index({ 'bloodRequirement.bloodGroup': 1, 'bloodRequirement.component': 1 });
+bloodRequestSchema.index({ status: 1, totalReservedUnits: 1 });
 
 const BloodRequest = mongoose.model('BloodRequest', bloodRequestSchema);
 module.exports = BloodRequest;

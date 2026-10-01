@@ -62,10 +62,19 @@
      3. APPLICATION STATE & DOM REFERENCES
      ----------------------------------------------------- */
   let activeHospital = null;
-  let authToken = localStorage.getItem('medbed_auth_token') || '';
+  // In-memory authentication state (AUTH-06: No access tokens in localStorage/sessionStorage)
+  let authToken = '';
+  let csrfToken = '';
   let currentUser = null;
+  let isRefreshing = null;
   let leafletMap = null;
   let markerLayerGroup = null;
+
+  // Clear legacy tokens from localStorage if any exist
+  try {
+    localStorage.removeItem('medbed_auth_token');
+  } catch (e) {}
+
 
   const hospitalGrid = document.getElementById('hospitalGrid');
   const emptyState = document.getElementById('emptyState');
@@ -139,13 +148,57 @@
   /* -----------------------------------------------------
      4. API CLIENT & HTTP UTILITIES
      ----------------------------------------------------- */
+  async function silentRefresh() {
+    if (isRefreshing) return isRefreshing;
+
+    isRefreshing = (async () => {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) {
+          headers['X-CSRF-Token'] = csrfToken;
+        }
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers,
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          authToken = '';
+          csrfToken = '';
+          currentUser = null;
+          return false;
+        }
+
+        const body = await res.json();
+        if (body.data?.token) {
+          authToken = body.data.token;
+          csrfToken = body.data.csrfToken || '';
+          currentUser = body.data.user || null;
+          return true;
+        }
+        return false;
+      } catch (err) {
+        return false;
+      } finally {
+        isRefreshing = null;
+      }
+    })();
+
+    return isRefreshing;
+  }
+
   async function apiRequest(endpoint, options = {}) {
     const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
     if (authToken) {
       headers['Authorization'] = `Bearer ${authToken}`;
     }
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
 
     const config = {
+      credentials: 'include',
       ...options,
       headers,
     };
@@ -179,10 +232,19 @@
     }
 
     if (!res.ok) {
-      if (res.status === 401 && authToken) {
+      // If 401 and request was authenticated, try silent refresh once
+      if (res.status === 401 && !options._isRetry && !endpoint.startsWith('/auth/')) {
+        const refreshed = await silentRefresh();
+        if (refreshed) {
+          return apiRequest(endpoint, { ...options, _isRetry: true });
+        }
         authToken = '';
+        csrfToken = '';
         currentUser = null;
-        localStorage.removeItem('medbed_auth_token');
+      } else if (res.status === 401 && endpoint.startsWith('/auth/')) {
+        authToken = '';
+        csrfToken = '';
+        currentUser = null;
       }
       const errMsg = body.message || body.errors?.[0]?.message || `Request failed with status ${res.status}`;
       const err = new Error(errMsg);
@@ -193,6 +255,7 @@
 
     return body;
   }
+
 
   function formatErrorMessage(item) {
     if (!item) return '';
@@ -663,6 +726,10 @@
 
     async function ensureAuth() {
       if (!authToken) {
+        // Attempt silent refresh first
+        const refreshed = await silentRefresh();
+        if (refreshed && authToken) return;
+
         try {
           const authRes = await apiRequest('/auth/login', {
             method: 'POST',
@@ -670,7 +737,8 @@
           });
           if (authRes.data?.token) {
             authToken = authRes.data.token;
-            localStorage.setItem('medbed_auth_token', authToken);
+            csrfToken = authRes.data.csrfToken || '';
+            currentUser = authRes.data.user || null;
           }
         } catch (authErr) {
           // If login fails, try citizen registration
@@ -685,11 +753,13 @@
           });
           if (regRes.data?.token) {
             authToken = regRes.data.token;
-            localStorage.setItem('medbed_auth_token', authToken);
+            csrfToken = regRes.data.csrfToken || '';
+            currentUser = regRes.data.user || null;
           }
         }
       }
     }
+
 
     try {
       await ensureAuth();
@@ -737,10 +807,14 @@
   /* -----------------------------------------------------
      12. STAFF PORTAL & BED MANAGEMENT
      ----------------------------------------------------- */
-  function openStaffPortalModal() {
+  async function openStaffPortalModal() {
     staffPortalModalOverlay.hidden = false;
     document.body.style.overflow = 'hidden';
     populateStaffHospitalDropdown();
+
+    if (!authToken) {
+      await silentRefresh();
+    }
 
     if (authToken) {
       if (checkStaffSessionTimeout()) {
@@ -762,8 +836,8 @@
         })
         .catch(() => {
           authToken = '';
+          csrfToken = '';
           currentUser = null;
-          localStorage.removeItem('medbed_auth_token');
           localStorage.removeItem('medbed_staff_last_active');
           renderStaffLoginForm();
         });
@@ -1154,9 +1228,11 @@
       staffInactivityTimer = null;
     }
 
+    apiRequest('/auth/logout', { method: 'POST' }).catch(() => {});
+
     authToken = '';
+    csrfToken = '';
     currentUser = null;
-    localStorage.removeItem('medbed_auth_token');
     localStorage.removeItem('medbed_staff_last_active');
 
     // Ensure staff login form is rendered
@@ -1202,8 +1278,8 @@
       });
 
       authToken = res.data.token;
+      csrfToken = res.data.csrfToken || '';
       currentUser = res.data.user;
-      localStorage.setItem('medbed_auth_token', authToken);
       resetStaffInactivityTimer();
 
       showToast(`👋 Welcome, ${currentUser.name}!`);
@@ -1216,14 +1292,19 @@
     }
   });
 
-  staffLogoutBtn.addEventListener('click', () => {
+  staffLogoutBtn.addEventListener('click', async () => {
     if (staffInactivityTimer) {
       clearTimeout(staffInactivityTimer);
       staffInactivityTimer = null;
     }
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // Ignore network errors on logout
+    }
     authToken = '';
+    csrfToken = '';
     currentUser = null;
-    localStorage.removeItem('medbed_auth_token');
     localStorage.removeItem('medbed_staff_last_active');
     showToast('Logged out of Staff Portal.');
     renderStaffLoginForm();
@@ -1527,38 +1608,19 @@
     fetchStatisticsFromBackend();
     initSocket();
 
-    // Restore authenticated session if token exists
-    if (authToken && !currentUser) {
-      if (checkStaffSessionTimeout()) {
-        authToken = '';
-        currentUser = null;
-        localStorage.removeItem('medbed_auth_token');
-        localStorage.removeItem('medbed_staff_last_active');
-      } else {
-        apiRequest('/auth/me')
-          .then(res => {
-            if (res.data) {
-              currentUser = res.data;
-              resetStaffInactivityTimer();
-            }
-          })
-          .catch(() => {
-            authToken = '';
-            currentUser = null;
-            localStorage.removeItem('medbed_auth_token');
-            localStorage.removeItem('medbed_staff_last_active');
-          });
+    // Restore authenticated session via silent refresh if cookie exists
+    silentRefresh().then(success => {
+      if (success && authToken) {
+        if (checkStaffSessionTimeout()) {
+          authToken = '';
+          csrfToken = '';
+          currentUser = null;
+          localStorage.removeItem('medbed_staff_last_active');
+        } else {
+          resetStaffInactivityTimer();
+        }
       }
-    } else if (authToken && currentUser) {
-      if (checkStaffSessionTimeout()) {
-        authToken = '';
-        currentUser = null;
-        localStorage.removeItem('medbed_auth_token');
-        localStorage.removeItem('medbed_staff_last_active');
-      } else {
-        resetStaffInactivityTimer();
-      }
-    }
+    }).catch(() => {});
 
     // Initialize Emergency Patient Intake feature
     initEmergencyIntake();

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const BedRequest = require('../models/BedRequest');
 const EmergencyIntake = require('../models/EmergencyIntake');
 const { performReadinessCheck } = require('../services/readinessCheckService');
+const { escapeRegex } = require('../utils/regexUtils');
 
 const extractPayload = (body) => {
   const patientName = body.patientName || body.patientInfo?.name || '';
@@ -116,13 +117,21 @@ const createReferral = async (req, res, next) => {
     const data = extractPayload(req.body);
     const { bedRequestId, emergencyIntakeId, patientId } = req.body;
 
-    // Check duplicate active referral
+    // Check duplicate active referral (defense-in-depth; DB unique index is authoritative)
     const activeStatuses = ['pending', 'accepted', 'more_information_requested', 'more_info_requested', 'transferred', 'received'];
     const duplicateQuery = {
       status: { $in: activeStatuses },
       $or: [],
     };
-    if (data.patientName) duplicateQuery.$or.push({ patientName: new RegExp(`^${data.patientName.trim()}$`, 'i') });
+    if (data.patientName) {
+      // SEC3-CONCUR-01F: Scope patientName check to same hospital pair
+      // Same patient can legitimately be referred to different hospitals
+      duplicateQuery.$or.push({
+        patientName: new RegExp(`^${escapeRegex(data.patientName.trim())}$`, 'i'),
+        referringHospital: referringHospitalId,
+        receivingHospital: data.destinationHospitalId,
+      });
+    }
     if (bedRequestId) duplicateQuery.$or.push({ bedRequest: bedRequestId });
     if (emergencyIntakeId) duplicateQuery.$or.push({ emergencyIntake: emergencyIntakeId });
 
@@ -236,6 +245,13 @@ const createReferral = async (req, res, next) => {
       data: populated,
     });
   } catch (error) {
+    // SEC3-CONCUR-01F: Handle database-level duplicate key constraint
+    if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) {
+      return res.status(409).json({
+        success: false,
+        message: 'An active referral already exists for this patient, bed request, or emergency intake. Duplicate creation prevented.',
+      });
+    }
     next(error);
   }
 };
@@ -384,18 +400,20 @@ const getDestinationDoctors = async (req, res, next) => {
   }
 };
 
+const buildAuditEntry = (referral, req, action, actionUpper, fromStatus, toStatus, notes) => ({
+  user: req.user._id,
+  userName: req.user.name,
+  hospital: req.user.hospital ? (req.user.hospital._id || req.user.hospital) : referral.receivingHospital,
+  action,
+  actionUpper,
+  fromStatus,
+  toStatus,
+  notes,
+  timestamp: new Date(),
+});
+
 const appendAudit = (referral, req, action, actionUpper, fromStatus, toStatus, notes) => {
-  const entry = {
-    user: req.user._id,
-    userName: req.user.name,
-    hospital: req.user.hospital ? (req.user.hospital._id || req.user.hospital) : referral.receivingHospital,
-    action,
-    actionUpper,
-    fromStatus,
-    toStatus,
-    notes,
-    timestamp: new Date(),
-  };
+  const entry = buildAuditEntry(referral, req, action, actionUpper, fromStatus, toStatus, notes);
   referral.history.push(entry);
   referral.auditTrail.push(entry);
 };
@@ -410,14 +428,46 @@ const acceptReferral = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized: Only receiving hospital can accept.' });
     }
 
-    const prev = referral.status;
-    referral.status = 'accepted';
-    referral.acceptedAt = new Date();
-    appendAudit(referral, req, 'accepted', 'REFERRAL_ACCEPTED', prev, 'accepted', req.body.note || req.body.notes || 'Referral accepted.');
-    await referral.save();
+    const allowedPrevious = ['pending', 'more_information_requested', 'more_info_requested'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot accept referral with status '${referral.status}'. Expected 'pending' or 'more_info_requested'.`,
+      });
+    }
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'accepted' });
-    res.status(200).json({ success: true, message: 'Referral accepted.', data: referral });
+    const note = req.body.note || req.body.notes || 'Referral accepted.';
+    const now = new Date();
+    const auditEntry = buildAuditEntry(referral, req, 'accepted', 'REFERRAL_ACCEPTED', referral.status, 'accepted', note);
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: {
+          status: 'accepted',
+          acceptedAt: now,
+        },
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot accept referral: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'accepted' });
+    res.status(200).json({ success: true, message: 'Referral accepted.', data: updatedReferral });
   } catch (error) {
     next(error);
   }
@@ -438,16 +488,47 @@ const rejectReferral = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'A specific reason for rejection is mandatory.' });
     }
 
-    const prev = referral.status;
-    referral.status = 'rejected';
-    referral.rejectedAt = new Date();
-    referral.rejectionReason = reason.trim();
-    referral.rejectedBy = req.user._id;
-    appendAudit(referral, req, 'rejected', 'REFERRAL_REJECTED', prev, 'rejected', reason.trim());
-    await referral.save();
+    const allowedPrevious = ['pending', 'more_information_requested', 'more_info_requested'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot reject referral with status '${referral.status}'. Expected 'pending' or 'more_info_requested'.`,
+      });
+    }
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'rejected' });
-    res.status(200).json({ success: true, message: 'Referral rejected.', data: referral });
+    const now = new Date();
+    const auditEntry = buildAuditEntry(referral, req, 'rejected', 'REFERRAL_REJECTED', referral.status, 'rejected', reason.trim());
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: {
+          status: 'rejected',
+          rejectedAt: now,
+          rejectionReason: reason.trim(),
+          rejectedBy: req.user._id,
+        },
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot reject referral: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'rejected' });
+    res.status(200).json({ success: true, message: 'Referral rejected.', data: updatedReferral });
   } catch (error) {
     next(error);
   }
@@ -468,17 +549,48 @@ const requestMoreInfo = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Description of information required is mandatory.' });
     }
 
-    const prev = referral.status;
-    referral.status = 'more_info_requested';
-    referral.informationRequest = note.trim();
-    referral.moreInfoRequestedNote = note.trim();
-    referral.informationRequestedAt = new Date();
-    referral.informationRequestedBy = req.user._id;
-    appendAudit(referral, req, 'more_info_requested', 'MORE_INFO_REQUESTED', prev, 'more_info_requested', note.trim());
-    await referral.save();
+    const allowedPrevious = ['pending'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot request more information for referral with status '${referral.status}'. Expected 'pending'.`,
+      });
+    }
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'more_info_requested' });
-    res.status(200).json({ success: true, message: 'More information requested.', data: referral });
+    const now = new Date();
+    const auditEntry = buildAuditEntry(referral, req, 'more_info_requested', 'MORE_INFO_REQUESTED', referral.status, 'more_info_requested', note.trim());
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: {
+          status: 'more_info_requested',
+          informationRequest: note.trim(),
+          moreInfoRequestedNote: note.trim(),
+          informationRequestedAt: now,
+          informationRequestedBy: req.user._id,
+        },
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot request more information: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'more_info_requested' });
+    res.status(200).json({ success: true, message: 'More information requested.', data: updatedReferral });
   } catch (error) {
     next(error);
   }
@@ -494,21 +606,59 @@ const updateReferral = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized: Only referring hospital can update.' });
     }
 
-    if (req.body.clinicalHandoff) {
-      Object.assign(referral.clinicalHandoff, req.body.clinicalHandoff);
-      if (req.body.clinicalHandoff.proceduresDone) referral.proceduresPerformed = req.body.clinicalHandoff.proceduresDone;
-      if (req.body.clinicalHandoff.treatmentGiven) referral.treatmentGiven = req.body.clinicalHandoff.treatmentGiven;
+    const allowedPrevious = ['more_info_requested', 'more_information_requested', 'pending'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot update referral with status '${referral.status}'. Expected 'more_info_requested' or 'pending'.`,
+      });
     }
-    if (req.body.proceduresPerformed) referral.proceduresPerformed = req.body.proceduresPerformed;
-    if (req.body.treatmentGiven) referral.treatmentGiven = req.body.treatmentGiven;
 
-    const prev = referral.status;
-    referral.status = 'pending';
-    appendAudit(referral, req, 'updated', 'CLINICAL_INFO_UPDATED', prev, 'pending', req.body.updateNotes || 'Clinical handoff updated.');
-    await referral.save();
+    const setFields = {
+      status: 'pending',
+    };
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'pending' });
-    res.status(200).json({ success: true, message: 'Referral updated and returned to pending review.', data: referral });
+    if (req.body.clinicalHandoff) {
+      for (const [k, v] of Object.entries(req.body.clinicalHandoff)) {
+        setFields[`clinicalHandoff.${k}`] = v;
+      }
+      if (req.body.clinicalHandoff.proceduresDone) {
+        setFields.proceduresPerformed = req.body.clinicalHandoff.proceduresDone;
+      }
+      if (req.body.clinicalHandoff.treatmentGiven) {
+        setFields.treatmentGiven = req.body.clinicalHandoff.treatmentGiven;
+      }
+    }
+    if (req.body.proceduresPerformed) setFields.proceduresPerformed = req.body.proceduresPerformed;
+    if (req.body.treatmentGiven) setFields.treatmentGiven = req.body.treatmentGiven;
+
+    const auditEntry = buildAuditEntry(referral, req, 'updated', 'CLINICAL_INFO_UPDATED', referral.status, 'pending', req.body.updateNotes || 'Clinical handoff updated.');
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: setFields,
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot update referral: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'pending' });
+    res.status(200).json({ success: true, message: 'Referral updated and returned to pending review.', data: updatedReferral });
   } catch (error) {
     next(error);
   }
@@ -524,14 +674,45 @@ const markTransferred = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized: Only referring hospital can mark transferred.' });
     }
 
-    const prev = referral.status;
-    referral.status = 'transferred';
-    referral.transferredAt = new Date();
-    appendAudit(referral, req, 'transferred', 'PATIENT_TRANSFERRED', prev, 'transferred', req.body.note || 'Patient transferred.');
-    await referral.save();
+    const allowedPrevious = ['accepted'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot mark referral as transferred with status '${referral.status}'. Expected 'accepted'.`,
+      });
+    }
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'transferred' });
-    res.status(200).json({ success: true, message: 'Patient marked as transferred.', data: referral });
+    const now = new Date();
+    const auditEntry = buildAuditEntry(referral, req, 'transferred', 'PATIENT_TRANSFERRED', referral.status, 'transferred', req.body.note || 'Patient transferred.');
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: {
+          status: 'transferred',
+          transferredAt: now,
+        },
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot mark referral as transferred: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'transferred' });
+    res.status(200).json({ success: true, message: 'Patient marked as transferred.', data: updatedReferral });
   } catch (error) {
     next(error);
   }
@@ -547,14 +728,45 @@ const markReceived = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized: Only receiving hospital can mark received.' });
     }
 
-    const prev = referral.status;
-    referral.status = 'received';
-    referral.receivedAt = new Date();
-    appendAudit(referral, req, 'received', 'PATIENT_RECEIVED', prev, 'received', req.body.note || 'Patient received.');
-    await referral.save();
+    const allowedPrevious = ['transferred'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot mark referral as received with status '${referral.status}'. Expected 'transferred'.`,
+      });
+    }
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'received' });
-    res.status(200).json({ success: true, message: 'Patient marked as received.', data: referral });
+    const now = new Date();
+    const auditEntry = buildAuditEntry(referral, req, 'received', 'PATIENT_RECEIVED', referral.status, 'received', req.body.note || 'Patient received.');
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: {
+          status: 'received',
+          receivedAt: now,
+        },
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot mark referral as received: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'received' });
+    res.status(200).json({ success: true, message: 'Patient marked as received.', data: updatedReferral });
   } catch (error) {
     next(error);
   }
@@ -570,14 +782,45 @@ const completeReferral = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized: Only receiving hospital can complete.' });
     }
 
-    const prev = referral.status;
-    referral.status = 'completed';
-    referral.completedAt = new Date();
-    appendAudit(referral, req, 'completed', 'REFERRAL_COMPLETED', prev, 'completed', req.body.note || 'Referral completed.');
-    await referral.save();
+    const allowedPrevious = ['received'];
+    if (!allowedPrevious.includes(referral.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot complete referral with status '${referral.status}'. Expected 'received'.`,
+      });
+    }
 
-    if (req.io) req.io.emit('referral:status_change', { referralId: referral._id, status: 'completed' });
-    res.status(200).json({ success: true, message: 'Referral marked as completed.', data: referral });
+    const now = new Date();
+    const auditEntry = buildAuditEntry(referral, req, 'completed', 'REFERRAL_COMPLETED', referral.status, 'completed', req.body.note || 'Referral completed.');
+
+    const updatedReferral = await Referral.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: allowedPrevious },
+      },
+      {
+        $set: {
+          status: 'completed',
+          completedAt: now,
+        },
+        $push: {
+          history: auditEntry,
+          auditTrail: auditEntry,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!updatedReferral) {
+      const current = await Referral.findById(req.params.id).lean();
+      return res.status(409).json({
+        success: false,
+        message: `Cannot complete referral: state transition conflict. Current status is '${current ? current.status : 'unknown'}'.`,
+      });
+    }
+
+    if (req.io) req.io.emit('referral:status_change', { referralId: updatedReferral._id, status: 'completed' });
+    res.status(200).json({ success: true, message: 'Referral marked as completed.', data: updatedReferral });
   } catch (error) {
     next(error);
   }

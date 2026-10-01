@@ -177,14 +177,44 @@ const updateBed = async (req, res, next) => {
       });
     }
 
+    // SEC3-CONCUR-01G: OCC version check if supplied by client
+    const expectedVersion = req.body.version !== undefined ? req.body.version : req.body.__v;
+    if (expectedVersion !== undefined && bed.__v !== parseInt(expectedVersion, 10)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Stale update rejected. Bed record version does not match expected version.',
+        errors: [],
+      });
+    }
+
     const { totalBeds, occupiedBeds, reservedBeds } = req.body;
 
-    if (totalBeds !== undefined) bed.totalBeds = parseInt(totalBeds, 10);
-    if (occupiedBeds !== undefined) bed.occupiedBeds = parseInt(occupiedBeds, 10);
-    if (reservedBeds !== undefined) bed.reservedBeds = parseInt(reservedBeds, 10);
+    const targetTotal = totalBeds !== undefined ? parseInt(totalBeds, 10) : bed.totalBeds;
+    const targetOccupied = occupiedBeds !== undefined ? parseInt(occupiedBeds, 10) : bed.occupiedBeds;
+    const targetReserved = reservedBeds !== undefined ? parseInt(reservedBeds, 10) : bed.reservedBeds;
 
-    // Bed schema pre-validate hook enforces:
-    // occupied + reserved <= total, and recalculates availableBeds
+    if (targetTotal < 0 || targetOccupied < 0 || targetReserved < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bed counters: counters cannot be negative.',
+        errors: [],
+      });
+    }
+
+    if (targetOccupied + targetReserved > targetTotal) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid bed counters: occupiedBeds (${targetOccupied}) + reservedBeds (${targetReserved}) cannot exceed totalBeds (${targetTotal}).`,
+        errors: [],
+      });
+    }
+
+    bed.totalBeds = targetTotal;
+    bed.occupiedBeds = targetOccupied;
+    bed.reservedBeds = targetReserved;
+
+    // Bed schema pre-validate hook enforces invariants and recalculates availableBeds.
+    // optimisticConcurrency option on bedSchema ensures Mongoose validates __v on save.
     await bed.save();
 
     // Update hospital's lastAvailabilityUpdate
@@ -208,12 +238,19 @@ const updateBed = async (req, res, next) => {
       data: bed,
     });
   } catch (error) {
+    if (error.name === 'VersionError') {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Stale bed counter update detected. Record was modified concurrently.',
+        errors: [],
+      });
+    }
     next(error);
   }
 };
 
 /**
- * @desc    Quick update bed availability (occupied/reserved delta)
+ * @desc    Quick update bed availability (occupied/reserved delta or absolute values)
  * @route   PATCH /api/beds/:id/availability
  * @access  Private/Admin
  */
@@ -237,17 +274,125 @@ const patchBedAvailability = async (req, res, next) => {
       });
     }
 
-    if (req.body.occupiedBeds !== undefined) {
-      bed.occupiedBeds = parseInt(req.body.occupiedBeds, 10);
-    }
-    if (req.body.reservedBeds !== undefined) {
-      bed.reservedBeds = parseInt(req.body.reservedBeds, 10);
-    }
-    if (req.body.totalBeds !== undefined) {
-      bed.totalBeds = parseInt(req.body.totalBeds, 10);
+    // SEC3-CONCUR-01G: Check if delta-based update is requested
+    const isDelta =
+      req.body.occupiedBedsDelta !== undefined ||
+      req.body.occupiedDelta !== undefined ||
+      req.body.reservedBedsDelta !== undefined ||
+      req.body.reservedDelta !== undefined ||
+      req.body.totalBedsDelta !== undefined ||
+      req.body.totalDelta !== undefined;
+
+    if (isDelta) {
+      const dOcc = parseInt(req.body.occupiedBedsDelta ?? req.body.occupiedDelta ?? 0, 10) || 0;
+      const dRes = parseInt(req.body.reservedBedsDelta ?? req.body.reservedDelta ?? 0, 10) || 0;
+      const dTotal = parseInt(req.body.totalBedsDelta ?? req.body.totalDelta ?? 0, 10) || 0;
+
+      const dAvail = dTotal - dOcc - dRes;
+      const inc = {};
+      if (dOcc !== 0) inc.occupiedBeds = dOcc;
+      if (dRes !== 0) inc.reservedBeds = dRes;
+      if (dTotal !== 0) inc.totalBeds = dTotal;
+      if (dAvail !== 0) inc.availableBeds = dAvail;
+      inc.__v = 1;
+
+      // Atomic conditional update using MongoDB $inc with $expr invariant guard
+      // Enforces invariants at database level:
+      // occupiedBeds + dOcc >= 0
+      // reservedBeds + dRes >= 0
+      // totalBeds + dTotal >= 0
+      // (occupiedBeds + dOcc) + (reservedBeds + dRes) <= totalBeds + dTotal
+      const updatedBed = await Bed.findOneAndUpdate(
+        {
+          _id: bed._id,
+          $expr: {
+            $and: [
+              { $gte: [{ $add: ['$occupiedBeds', dOcc] }, 0] },
+              { $gte: [{ $add: ['$reservedBeds', dRes] }, 0] },
+              { $gte: [{ $add: ['$totalBeds', dTotal] }, 0] },
+              {
+                $lte: [
+                  { $add: [{ $add: ['$occupiedBeds', dOcc] }, { $add: ['$reservedBeds', dRes] }] },
+                  { $add: ['$totalBeds', dTotal] },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          $inc: inc,
+          $set: { lastUpdated: new Date() },
+        },
+        { returnDocument: 'after' }
+      );
+
+      if (!updatedBed) {
+        return res.status(400).json({
+          success: false,
+          message: 'Capacity or counter invariant violated: counters cannot be negative and occupied + reserved cannot exceed total beds.',
+          errors: [],
+        });
+      }
+
+      hospital.lastAvailabilityUpdate = new Date();
+      await hospital.save();
+
+      broadcastBedUpdate(req.io, {
+        hospitalId: hospital._id.toString(),
+        bedType: updatedBed.type,
+        availableBeds: updatedBed.availableBeds,
+        totalBeds: updatedBed.totalBeds,
+        occupiedBeds: updatedBed.occupiedBeds,
+        reservedBeds: updatedBed.reservedBeds,
+        lastUpdated: updatedBed.lastUpdated,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Bed availability updated successfully',
+        data: updatedBed,
+      });
     }
 
+    // SEC3-CONCUR-01G: Absolute value update with OCC version check
+    const expectedVersion = req.body.version !== undefined ? req.body.version : req.body.__v;
+    if (expectedVersion !== undefined && bed.__v !== parseInt(expectedVersion, 10)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Stale update rejected. Bed record version does not match expected version.',
+        errors: [],
+      });
+    }
+
+    const targetTotal = req.body.totalBeds !== undefined ? parseInt(req.body.totalBeds, 10) : bed.totalBeds;
+    const targetOccupied = req.body.occupiedBeds !== undefined ? parseInt(req.body.occupiedBeds, 10) : bed.occupiedBeds;
+    const targetReserved = req.body.reservedBeds !== undefined ? parseInt(req.body.reservedBeds, 10) : bed.reservedBeds;
+
+    if (targetTotal < 0 || targetOccupied < 0 || targetReserved < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bed counters: counters cannot be negative.',
+        errors: [],
+      });
+    }
+
+    if (targetOccupied + targetReserved > targetTotal) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid bed counters: occupiedBeds (${targetOccupied}) + reservedBeds (${targetReserved}) cannot exceed totalBeds (${targetTotal}).`,
+        errors: [],
+      });
+    }
+
+    bed.occupiedBeds = targetOccupied;
+    bed.reservedBeds = targetReserved;
+    bed.totalBeds = targetTotal;
+
+    // Save with Mongoose OCC protection
     await bed.save();
+
+    hospital.lastAvailabilityUpdate = new Date();
+    await hospital.save();
 
     broadcastBedUpdate(req.io, {
       hospitalId: hospital._id.toString(),
@@ -265,6 +410,13 @@ const patchBedAvailability = async (req, res, next) => {
       data: bed,
     });
   } catch (error) {
+    if (error.name === 'VersionError') {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Stale bed counter update detected. Record was modified concurrently.',
+        errors: [],
+      });
+    }
     next(error);
   }
 };

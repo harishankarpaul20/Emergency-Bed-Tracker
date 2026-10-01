@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 /**
  * Protect routes: verifies JWT and attaches authenticated user to req.user
@@ -22,8 +23,18 @@ const authenticate = async (req, res, next) => {
     });
   }
 
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    logger.error('CRITICAL: JWT_SECRET is not configured in environment variables.');
+    return res.status(500).json({
+      success: false,
+      message: 'Server authentication configuration error. Please contact system administrator.',
+      errors: [],
+    });
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret_fallback_key');
+    const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
     const user = await User.findById(decoded.id).select('-passwordHash');
 
     if (!user) {
@@ -76,8 +87,13 @@ const optionalAuth = async (req, res, next) => {
     return next();
   }
 
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return next();
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret_fallback_key');
+    const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
     const user = await User.findById(decoded.id).select('-passwordHash');
     if (user && user.isActive) {
       req.user = user;

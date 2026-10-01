@@ -48,6 +48,9 @@ const createBedRequest = async (req, res, next) => {
       data: request,
     });
   } catch (error) {
+    if (error.statusCode) {
+      res.status(error.statusCode);
+    }
     next(error);
   }
 };
@@ -247,6 +250,9 @@ const approveBedRequest = async (req, res, next) => {
       data: updated,
     });
   } catch (error) {
+    if (error.statusCode) {
+      res.status(error.statusCode);
+    }
     next(error);
   }
 };
@@ -283,6 +289,9 @@ const rejectBedRequest = async (req, res, next) => {
       data: updated,
     });
   } catch (error) {
+    if (error.statusCode) {
+      res.status(error.statusCode);
+    }
     next(error);
   }
 };
@@ -322,6 +331,9 @@ const cancelBedRequest = async (req, res, next) => {
       data: updated,
     });
   } catch (error) {
+    if (error.statusCode) {
+      res.status(error.statusCode);
+    }
     next(error);
   }
 };
@@ -358,6 +370,9 @@ const completeBedRequest = async (req, res, next) => {
       data: updated,
     });
   } catch (error) {
+    if (error.statusCode) {
+      res.status(error.statusCode);
+    }
     next(error);
   }
 };

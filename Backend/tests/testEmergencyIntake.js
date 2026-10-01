@@ -9,6 +9,8 @@ const mongoose = require('mongoose');
 const { app } = require('../server');
 const { connectDB, disconnectDB } = require('../config/db');
 const EmergencyIntake = require('../models/EmergencyIntake');
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 const TEST_PORT = 5002;
 const BASE_URL = `http://localhost:${TEST_PORT}/api/emergency`;
@@ -163,14 +165,22 @@ async function runIntakeTests() {
       savedDoc.status === 'received';
     recordTest(9, 'MongoDB Atlas Persistence Verification', Boolean(isPersisted), `Saved ID: ${createdIntakeId}`);
 
-    // 10. GET /api/emergency/intake/:id retrieval
-    const resGet = await requestJson(`${BASE_URL}/intake/${createdIntakeId}`);
+    // 10. GET /api/emergency/intake/:id unauthenticated access rejected with 401
+    const resUnauth = await requestJson(`${BASE_URL}/intake/${createdIntakeId}`);
+    recordTest(10, 'Intake Retrieval Without Auth Rejected with HTTP 401', resUnauth.status === 401);
+
+    // 11. GET /api/emergency/intake/:id authorized retrieval with token
+    const adminUser = await User.findOne({ role: 'super_admin' });
+    const authToken = jwt.sign({ id: adminUser ? adminUser._id : new mongoose.Types.ObjectId(), role: 'super_admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resAuth = await requestJson(`${BASE_URL}/intake/${createdIntakeId}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
     const getOk =
-      resGet.status === 200 &&
-      resGet.body.success === true &&
-      resGet.body.data.patientName === 'Ananya Mukherjee' &&
-      resGet.body.data.contactNumber.includes('******');
-    recordTest(10, 'Intake Retrieval by ID with Masked Contact', getOk);
+      resAuth.status === 200 &&
+      resAuth.body.success === true &&
+      resAuth.body.data.patientName === 'Ananya Mukherjee' &&
+      resAuth.body.data.contactNumber.length > 0;
+    recordTest(11, 'Authorized Intake Retrieval by ID Succeeded (HTTP 200)', getOk);
 
   } catch (err) {
     console.error('Test execution error:', err);

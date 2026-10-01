@@ -348,6 +348,13 @@ const DEMO_HOSPITALS = [
 ];
 
 async function seedDatabase(customUri = null) {
+  // Production safety guard: prevent accidental deletion/overwriting of production data
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_SEED !== 'true') {
+    const errorMsg = 'CRITICAL: Database seeding is blocked in production environment. To bypass this safety guard intentionally, set ALLOW_PRODUCTION_SEED=true.';
+    console.error(`🚫 ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+
   try {
     console.log('🌱 Connecting to database for seeding...');
     await connectDB(customUri);

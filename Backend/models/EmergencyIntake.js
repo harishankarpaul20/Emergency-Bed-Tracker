@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const emergencyIntakeSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     patientName: {
       type: String,
       required: [true, 'Patient name is required'],

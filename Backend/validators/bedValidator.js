@@ -48,6 +48,14 @@ const updateBedRules = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Reserved beds must be a non-negative integer'),
+  body('version')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Version must be a non-negative integer'),
+  body('__v')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Version must be a non-negative integer'),
 ];
 
 const patchBedAvailabilityRules = [
@@ -66,6 +74,38 @@ const patchBedAvailabilityRules = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Total beds must be a non-negative integer'),
+  body('occupiedBedsDelta')
+    .optional()
+    .isInt()
+    .withMessage('Occupied beds delta must be an integer'),
+  body('reservedBedsDelta')
+    .optional()
+    .isInt()
+    .withMessage('Reserved beds delta must be an integer'),
+  body('totalBedsDelta')
+    .optional()
+    .isInt()
+    .withMessage('Total beds delta must be an integer'),
+  body('occupiedDelta')
+    .optional()
+    .isInt()
+    .withMessage('Occupied beds delta must be an integer'),
+  body('reservedDelta')
+    .optional()
+    .isInt()
+    .withMessage('Reserved beds delta must be an integer'),
+  body('totalDelta')
+    .optional()
+    .isInt()
+    .withMessage('Total beds delta must be an integer'),
+  body('version')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Version must be a non-negative integer'),
+  body('__v')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Version must be a non-negative integer'),
 ];
 
 module.exports = {

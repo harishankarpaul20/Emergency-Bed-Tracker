@@ -3,6 +3,7 @@ const BloodInventory = require('../models/BloodInventory');
 const BedRequest = require('../models/BedRequest');
 const AuditLog = require('../models/AuditLog');
 const { getCompatibleBloodGroups, ensureHospitalBloodInventory } = require('../services/bloodInventoryService');
+const { escapeRegex } = require('../utils/regexUtils');
 
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return null;
@@ -40,10 +41,10 @@ const searchBloodAvailability = async (req, res, next) => {
     // Build hospital query
     const hospQuery = { isActive: true };
     if (district && district !== 'all' && district !== 'All Districts') {
-      hospQuery.district = new RegExp('^' + district.trim() + '$', 'i');
+      hospQuery.district = new RegExp('^' + escapeRegex(district.trim()) + '$', 'i');
     }
     if (city && city !== 'all' && city !== 'All Areas') {
-      hospQuery.area = new RegExp(city.trim(), 'i');
+      hospQuery.area = new RegExp(escapeRegex(city.trim()), 'i');
     }
 
     const hospitals = await Hospital.find(hospQuery).lean();
@@ -187,13 +188,14 @@ const getBloodBanks = async (req, res, next) => {
     const query = { isActive: true };
 
     if (district && district !== 'all') {
-      query.district = new RegExp('^' + district.trim() + '$', 'i');
+      query.district = new RegExp('^' + escapeRegex(district.trim()) + '$', 'i');
     }
-    if (search) {
+    if (search && search.trim()) {
+      const s = escapeRegex(search.trim());
       query.$or = [
-        { name: new RegExp(search.trim(), 'i') },
-        { address: new RegExp(search.trim(), 'i') },
-        { area: new RegExp(search.trim(), 'i') },
+        { name: new RegExp(s, 'i') },
+        { address: new RegExp(s, 'i') },
+        { area: new RegExp(s, 'i') },
       ];
     }
 

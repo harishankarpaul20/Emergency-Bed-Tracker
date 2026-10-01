@@ -82,25 +82,30 @@ backend/
 
 ## ⚙️ Environment Configuration
 
-Create or verify `backend/.env` containing:
+Create or verify `Backend/.env` containing:
 
 ```env
 PORT=5000
 NODE_ENV=development
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xztvwaj.mongodb.net/?retryWrites=true&w=majority
-JWT_SECRET=super_secret_jwt_key_west_bengal_emergency_2026
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.example.mongodb.net/medical_bed_tracker?retryWrites=true&w=majority
+JWT_SECRET=replace_with_a_secure_random_string_at_least_32_chars
 JWT_EXPIRES_IN=7d
 RATE_LIMIT_WINDOW_MINUTES=15
 RATE_LIMIT_MAX_REQUESTS=300
 AUTH_RATE_LIMIT_MAX_REQUESTS=30
 CLIENT_URL=http://localhost:5500
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=qwen/qwen3.8-27b
 ```
 
 ---
 
 ## 👥 Demo Accounts & Credentials
 
-The database seeder automatically initializes three demo user accounts:
+> [!WARNING]
+> These demo accounts are strictly for **local offline development and testing**. Database seeding is strictly blocked in production environments (`NODE_ENV=production`). Never use these credentials in staging or production.
+
+The database seeder initializes three demo user accounts for local development:
 
 | Role | Email | Password | Affiliation / Notes |
 | :--- | :--- | :--- | :--- |
