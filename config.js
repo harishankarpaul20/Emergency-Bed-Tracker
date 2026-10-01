@@ -11,6 +11,9 @@
 (function () {
   'use strict';
 
+  if (window.__EB_CONFIG_LOADED__) return;
+  window.__EB_CONFIG_LOADED__ = true;
+
   // 1. Production Backend URL (Configure this with your deployed backend URL on Render, Railway, etc.)
   // Note: Must be an HTTPS endpoint when the frontend is served via GitHub Pages (HTTPS).
   const PRODUCTION_BACKEND_URL = 'https://emergency-bed-tracker.onrender.com';
@@ -30,7 +33,24 @@
     hostname === ''
   );
 
-  // 4. Resolve Active URLs (Priority: window override > localStorage override > environment default)
+  // 4. Inject Active Environment Content-Security-Policy (CSP)
+  // In local development, connect-src allows local backend (localhost/127.0.0.1) and WebSocket.
+  // In production (GitHub Pages), connect-src strictly restricts to production endpoints (no localhost).
+  try {
+    const existingCsp = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+    if (!existingCsp && document.head) {
+      const cspMeta = document.createElement('meta');
+      cspMeta.httpEquiv = 'Content-Security-Policy';
+      const localConnect = "connect-src 'self' http://localhost:5000 ws://localhost:5000 http://127.0.0.1:5000 ws://127.0.0.1:5000 https://emergency-bed-tracker.onrender.com wss://emergency-bed-tracker.onrender.com;";
+      const prodConnect = "connect-src 'self' https://emergency-bed-tracker.onrender.com wss://emergency-bed-tracker.onrender.com;";
+      cspMeta.content = `default-src 'self'; script-src 'self' https://cdn.socket.io https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; ${isLocal ? localConnect : prodConnect} frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';`;
+      document.head.appendChild(cspMeta);
+    }
+  } catch (cspErr) {
+    console.warn('CSP initialization notice:', cspErr);
+  }
+
+  // 5. Resolve Active URLs (Priority: window override > localStorage override > environment default)
   let customApiOverride = window.API_BASE_URL || localStorage.getItem('API_BASE_URL');
   let customSocketOverride = window.SOCKET_URL || localStorage.getItem('SOCKET_URL');
 
@@ -47,7 +67,7 @@
   window.API_BASE_URL = customApiOverride || (isLocal ? LOCAL_API_URL : PRODUCTION_API_URL);
   window.SOCKET_URL = customSocketOverride || (isLocal ? LOCAL_BACKEND_URL : PRODUCTION_BACKEND_URL);
 
-  // 5. Expose helper for live switching directly in browser console
+  // 6. Expose helper for live switching directly in browser console
   window.setBackendUrl = function (url) {
     if (!url) {
       localStorage.removeItem('API_BASE_URL');

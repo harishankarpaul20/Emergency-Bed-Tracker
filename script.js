@@ -2826,7 +2826,10 @@
   // Socket.IO live notifications for referrals
   if (typeof io !== 'undefined') {
     try {
-      const socket = io();
+      const socket = io(SOCKET_URL, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
       socket.on('referral:created', (data) => {
         const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;
         if (String(userHospId) === String(data.receivingHospital)) {
@@ -4402,7 +4405,10 @@
   // --- 10. REAL-TIME SOCKET.IO LISTENERS FOR BLOOD ---
   if (typeof io !== 'undefined') {
     try {
-      const bSocket = io();
+      const bSocket = io(SOCKET_URL, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
       bSocket.on('bloodRequestCreated', (data) => {
         showToast('🔔 New emergency blood request broadcasted across network!');
         const userHospId = currentUser?.hospital?._id || currentUser?.hospitalId || currentUser?.hospital;

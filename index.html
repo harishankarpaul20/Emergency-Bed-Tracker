@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="config.js?v=2.6"></script>
+<noscript>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.socket.io https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://emergency-bed-tracker.onrender.com wss://emergency-bed-tracker.onrender.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+</noscript>
 <title>Emergency Bed Tracker — West Bengal</title>
 <meta name="description" content="Search hospitals across West Bengal's 23 districts and view demo bed availability. Demo platform — confirm directly with hospitals.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2848,9 +2851,8 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- Socket.IO & Leaflet Scripts -->
-<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<script src="socket.io.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=2.5"></script>
 <script src="script.js?v=2.7"></script>
 </body>
 </html>
